@@ -168,7 +168,7 @@ export default function FacebookLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-[rgb(24,25,26)]">
       {/* ══════════ TOP NAVBAR ══════════ */}
-      <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-[rgb(36,37,38)] border-b border-[rgb(58,59,60)] flex items-center px-4 gap-2">
+      <header className="fixed top-0 left-0 md:left-[68px] lg:left-[240px] right-0 z-40 h-14 bg-[rgb(36,37,38)] border-b border-[rgb(58,59,60)] flex items-center px-4 gap-2 transition-all duration-200">
         {/* Left: Logo */}
         <div className="flex items-center gap-2 shrink-0">
           <FBLogo className="w-10 h-10 text-[rgb(66,133,244)]" />
@@ -253,7 +253,7 @@ export default function FacebookLayout({ children }: { children: ReactNode }) {
       </header>
 
       {/* ══════════ LEFT SIDEBAR ══════════ */}
-      <aside className="hidden xl:block fixed left-0 top-14 bottom-0 w-[300px] overflow-y-auto bg-[rgb(24,25,26)] pt-4 pb-8 px-2 scrollbar-thin">
+      <aside className="hidden xl:block fixed left-0 md:left-[68px] lg:left-[240px] top-14 bottom-0 w-[300px] overflow-y-auto bg-[rgb(24,25,26)] pt-4 pb-8 px-2 scrollbar-thin transition-all duration-200">
         {/* Profile */}
         <button className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-[rgb(58,59,60)] transition-colors">
           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold shrink-0">
@@ -464,29 +464,7 @@ export default function FacebookLayout({ children }: { children: ReactNode }) {
         </div>
       </main>
 
-      {/* ══════════ MOBILE BOTTOM NAV ══════════ */}
-      <nav className="xl:hidden fixed bottom-0 left-0 right-0 z-50 bg-[rgb(36,37,38)] border-t border-[rgb(58,59,60)] flex items-center h-14">
-        <button className="flex-1 flex flex-col items-center justify-center h-full text-[rgb(66,133,244)] relative">
-          <HomeIcon active />
-          <div className="absolute bottom-0 left-4 right-4 h-[2px] bg-[rgb(66,133,244)]" />
-        </button>
-        <button className="flex-1 flex items-center justify-center h-full">
-          <VideoIcon />
-        </button>
-        <button className="flex-1 flex items-center justify-center h-full">
-          <MarketplaceIcon />
-        </button>
-        <button className="flex-1 flex items-center justify-center h-full">
-          <GroupsIcon />
-        </button>
-        <button
-          onClick={() => setView("twitter")}
-          className="flex-1 flex flex-col items-center justify-center h-full text-[rgb(176,179,184)]"
-        >
-          <XLogo className="w-5 h-5" />
-          <span className="text-[10px] mt-0.5">Twitter</span>
-        </button>
-      </nav>
+      {/* Mobile bottom nav handled by LeftSidebar */}
     </div>
   );
 }

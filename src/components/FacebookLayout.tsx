@@ -69,7 +69,7 @@ function XLogo({ className }: { className?: string }) {
 }
 
 /* ─── Main Component ─── */
-export default function FacebookLayout({ children }: { children: ReactNode }) {
+export default function FacebookLayout({ children, goProButton }: { children: ReactNode; goProButton?: ReactNode }) {
   const { setView } = useView();
 
   return (
@@ -119,6 +119,9 @@ export default function FacebookLayout({ children }: { children: ReactNode }) {
 
         {/* Right icons */}
         <div className="flex items-center gap-2 ml-auto shrink-0">
+          {/* Go Pro button */}
+          {goProButton}
+
           {/* Switch to Twitter button */}
           <button
             onClick={() => setView("twitter")}

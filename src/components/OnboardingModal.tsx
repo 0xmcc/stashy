@@ -233,7 +233,7 @@ export default function OnboardingModal({ isOpen, onClose }: OnboardingModalProp
                           whileTap={{ scale: 0.98 }}
                           transition={{ duration: 0.2 }}
                         >
-                          Let's get nuts 🥜
+                          Let&apos;s get nuts 🥜
                         </motion.button>
                       </motion.div>
                     </motion.div>

@@ -14,8 +14,21 @@ interface TweetCardProps {
 export default function TweetCard({ tweet }: TweetCardProps) {
   const segments = tweet.tweet_text ? parseTextWithUrls(tweet.tweet_text) : [];
 
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't navigate if clicking on a link, button, or interactive element
+    const target = e.target as HTMLElement;
+    if (target.closest('a, button, [role="button"]')) return;
+    
+    if (tweet.source_url) {
+      window.open(tweet.source_url, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   return (
-    <article className="border-b border-[rgb(47,51,54)] px-4 py-3 hover:bg-[rgb(8,10,13)] transition-colors">
+    <article 
+      className="border-b border-[rgb(47,51,54)] px-4 py-3 hover:bg-[rgb(8,10,13)] transition-colors cursor-pointer"
+      onClick={handleCardClick}
+    >
       {/* Reply indicator */}
       {tweet.in_reply_to_tweet_id && (
         <div className="flex items-center gap-2 mb-1 ml-[56px]">

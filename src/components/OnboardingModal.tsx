@@ -171,41 +171,41 @@ export default function OnboardingModal({ isOpen, onClose }: OnboardingModalProp
                     className="flex-1 flex flex-col items-center justify-center text-center"
                   >
                     <motion.div variants={staggerContainer} initial="hidden" animate="visible">
-                      {/* Icon */}
-                      <motion.div variants={staggerItem} className="mb-6 relative flex justify-center">
+                      {/* Stashy the Squirrel */}
+                      <motion.div variants={staggerItem} className="mb-5 relative flex justify-center">
                         <motion.div
-                          className="w-20 h-20 rounded-full bg-gradient-to-br from-[rgb(29,155,240)] to-[rgb(120,86,255)] flex items-center justify-center shadow-lg shadow-[rgb(29,155,240)]/20"
+                          className="text-7xl select-none"
                           animate={{
-                            y: [0, -6, 0],
+                            y: [0, -8, 0],
+                            rotate: [0, 5, 0, -5, 0],
                           }}
                           transition={{
-                            duration: 3,
-                            ease: "easeInOut",
-                            repeat: Infinity,
+                            y: { duration: 2, ease: "easeInOut", repeat: Infinity },
+                            rotate: { duration: 4, ease: "easeInOut", repeat: Infinity },
                           }}
                         >
-                          <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" />
-                          </svg>
+                          🐿️
                         </motion.div>
-                        {/* Sparkle accents */}
+                        {/* Acorn accents */}
                         <motion.div
-                          className="absolute -top-1 right-[calc(50%-48px)] w-3 h-3 bg-[rgb(29,155,240)] rounded-full"
+                          className="absolute -top-1 right-[calc(50%-52px)] text-xl select-none"
                           animate={{
-                            scale: [1, 1.2, 1],
-                            opacity: [0.7, 1, 0.7],
+                            y: [0, -4, 0],
+                            opacity: [0.8, 1, 0.8],
                           }}
                           transition={{
                             duration: 2,
                             ease: "easeInOut",
                             repeat: Infinity,
                           }}
-                        />
+                        >
+                          🌰
+                        </motion.div>
                         <motion.div
-                          className="absolute bottom-0 left-[calc(50%-52px)] w-2 h-2 bg-[rgb(120,86,255)] rounded-full"
+                          className="absolute bottom-1 left-[calc(50%-48px)] text-lg select-none"
                           animate={{
-                            scale: [1, 1.2, 1],
-                            opacity: [0.7, 1, 0.7],
+                            y: [0, -3, 0],
+                            opacity: [0.8, 1, 0.8],
                           }}
                           transition={{
                             duration: 2,
@@ -213,14 +213,16 @@ export default function OnboardingModal({ isOpen, onClose }: OnboardingModalProp
                             repeat: Infinity,
                             delay: 0.5,
                           }}
-                        />
+                        >
+                          🌰
+                        </motion.div>
                       </motion.div>
 
-                      <motion.h2 variants={staggerItem} className="text-2xl font-bold text-white mb-3">
-                        Save what matters, skip the noise
+                      <motion.h2 variants={staggerItem} className="text-2xl font-bold text-white mb-2">
+                        Hey! I&apos;m Stashy 👋
                       </motion.h2>
-                      <motion.p variants={staggerItem} className="text-[rgb(160,165,170)] text-base mb-8 max-w-xs mx-auto">
-                        Your personal archive of the best posts — curated, searchable, organized
+                      <motion.p variants={staggerItem} className="text-[rgb(160,165,170)] text-base mb-8 max-w-xs mx-auto leading-relaxed">
+                        I help you hoard the best tweets like acorns for winter. Never lose a banger again!
                       </motion.p>
 
                       <motion.div variants={staggerItem}>
@@ -231,7 +233,7 @@ export default function OnboardingModal({ isOpen, onClose }: OnboardingModalProp
                           whileTap={{ scale: 0.98 }}
                           transition={{ duration: 0.2 }}
                         >
-                          Get Started
+                          Show me how! 🥜
                         </motion.button>
                       </motion.div>
                     </motion.div>
@@ -250,26 +252,29 @@ export default function OnboardingModal({ isOpen, onClose }: OnboardingModalProp
                     className="flex-1 flex flex-col items-center justify-center"
                   >
                     <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="w-full">
-                      <motion.h2 variants={staggerItem} className="text-xl font-bold text-white mb-8 text-center">
-                        How it works
-                      </motion.h2>
+                      <motion.div variants={staggerItem} className="text-center mb-6">
+                        <span className="text-4xl">🐿️</span>
+                        <motion.h2 className="text-xl font-bold text-white mt-2">
+                          Here&apos;s my stash strategy
+                        </motion.h2>
+                      </motion.div>
 
                       <div className="space-y-5 w-full max-w-xs mx-auto mb-8">
                         {[
                           {
-                            emoji: "🔖",
-                            title: "Save posts from Twitter & beyond",
-                            desc: "One click to archive what you love",
+                            emoji: "🌰",
+                            title: "Grab tweets with one click",
+                            desc: "See a gem? I'll stash it instantly",
                           },
                           {
                             emoji: "🔍",
-                            title: "Find anything instantly",
-                            desc: "Search across your entire collection",
+                            title: "Find any tweet, anytime",
+                            desc: "Unlike my actual acorns, you won't lose these",
                           },
                           {
-                            emoji: "✨",
-                            title: "AI-powered summaries",
-                            desc: "Get the key points at a glance",
+                            emoji: "🧠",
+                            title: "Smart summaries",
+                            desc: "I'll tell you what's worth reading",
                           },
                         ].map((item, i) => (
                           <motion.div
@@ -306,7 +311,7 @@ export default function OnboardingModal({ isOpen, onClose }: OnboardingModalProp
                           whileTap={{ scale: 0.98 }}
                           transition={{ duration: 0.2 }}
                         >
-                          Next
+                          What&apos;s it cost? 💰
                         </motion.button>
                       </motion.div>
                     </motion.div>
@@ -325,9 +330,12 @@ export default function OnboardingModal({ isOpen, onClose }: OnboardingModalProp
                     className="flex-1 flex flex-col"
                   >
                     <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="flex-1 flex flex-col">
-                      <motion.h2 variants={staggerItem} className="text-xl font-bold text-white mb-6 text-center">
-                        Choose your path
-                      </motion.h2>
+                      <motion.div variants={staggerItem} className="text-center mb-5">
+                        <span className="text-3xl">🐿️</span>
+                        <motion.h2 className="text-xl font-bold text-white mt-1">
+                          Pick your stash size
+                        </motion.h2>
+                      </motion.div>
 
                       <div className="space-y-4 flex-1">
                         {/* Free tier */}
@@ -338,11 +346,11 @@ export default function OnboardingModal({ isOpen, onClose }: OnboardingModalProp
                           transition={{ duration: 0.2 }}
                         >
                           <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-white font-bold">Free</h3>
-                            <span className="text-[rgb(113,118,123)] text-sm">$0/mo</span>
+                            <h3 className="text-white font-bold">🌱 Starter Squirrel</h3>
+                            <span className="text-[rgb(113,118,123)] text-sm">Free</span>
                           </div>
                           <p className="text-[rgb(113,118,123)] text-sm">
-                            Browse the latest 30 posts
+                            30 acorns... I mean tweets
                           </p>
                         </motion.div>
 
@@ -376,15 +384,15 @@ export default function OnboardingModal({ isOpen, onClose }: OnboardingModalProp
                             animate={{ y: 0, opacity: 1 }}
                             transition={{ delay: 0.4, duration: 0.3, ease: easeOutExpo }}
                           >
-                            BEST VALUE
+                            🏆 TOP STASHER
                           </motion.div>
 
                           <div className="flex items-center justify-between mb-3 mt-1 relative">
-                            <h3 className="text-white font-bold">Pro</h3>
+                            <h3 className="text-white font-bold">🐿️ Pro Squirrel</h3>
                             <span className="text-white text-sm font-medium">$9/mo</span>
                           </div>
                           <ul className="space-y-1.5 relative">
-                            {["Unlimited archive", "AI summaries", "Collections & tags", "Export anytime"].map((feature, i) => (
+                            {["Unlimited acorn storage", "Smart summaries", "Organize by tree (tags)", "Take your nuts anywhere"].map((feature, i) => (
                               <motion.li
                                 key={feature}
                                 className="flex items-center gap-2 text-[rgb(200,200,200)] text-sm"
@@ -428,7 +436,7 @@ export default function OnboardingModal({ isOpen, onClose }: OnboardingModalProp
                                 Loading…
                               </span>
                             ) : (
-                              "Go Pro — $9/mo"
+                              "Become Pro Squirrel 🐿️"
                             )}
                           </span>
                         </motion.button>
@@ -439,7 +447,7 @@ export default function OnboardingModal({ isOpen, onClose }: OnboardingModalProp
                           whileTap={{ scale: 0.98 }}
                           transition={{ duration: 0.2 }}
                         >
-                          Start Free
+                          Start small (free)
                         </motion.button>
                       </motion.div>
                     </motion.div>

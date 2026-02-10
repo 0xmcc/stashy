@@ -20,6 +20,11 @@ export default function LinkCard({ card }: LinkCardProps) {
     }
   })();
 
+  const hasTitle = Boolean(card.title?.trim());
+  const isTco = domain === "t.co" || card.url.includes("t.co/");
+  const headline = hasTitle ? card.title : domain;
+  const fallbackText = isTco ? "View article" : "View";
+
   return (
     <a
       href={card.url}
@@ -37,17 +42,24 @@ export default function LinkCard({ card }: LinkCardProps) {
         />
       )}
       <div className="px-3 py-2">
-        <div className="text-[rgb(113,118,123)] text-sm truncate">
-          {domain}
+        <div className="flex items-center gap-2 text-[rgb(113,118,123)] text-sm truncate">
+          <span className="truncate">{domain}</span>
+          {hasTitle && (
+            <span className="rounded-full border border-[rgb(47,51,54)] px-2 py-0.5 text-[11px] uppercase tracking-wide text-[rgb(113,118,123)]">
+              Article
+            </span>
+          )}
         </div>
-        {card.title && (
-          <div className="text-white text-sm mt-0.5 line-clamp-2">
-            {card.title}
-          </div>
-        )}
-        {card.description && (
+        <div className="text-white text-sm mt-0.5 line-clamp-2">
+          {headline}
+        </div>
+        {card.description ? (
           <div className="text-[rgb(113,118,123)] text-sm mt-0.5 line-clamp-2">
             {card.description}
+          </div>
+        ) : (
+          <div className="text-[rgb(113,118,123)] text-sm mt-0.5">
+            {fallbackText}
           </div>
         )}
       </div>

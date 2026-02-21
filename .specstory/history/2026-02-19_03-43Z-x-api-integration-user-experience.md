@@ -453,3 +453,599 @@ If you want, I can give you a concrete setup for **stable staging domain + previ
 
 ---
 
+_**User**_
+
+@/Users/marko/.cursor/projects/Users-marko-Code-stashy/terminals/1.txt:35-38 
+
+---
+
+_**Agent (model gpt-5.3-codex, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+**Explaining 403 error and fix steps**</details></think>
+
+---
+
+That snippet confirms the exact issue: you’re authenticated as GitHub user **`0xmcc`**, but the repo belongs to **`followmarkobot/stashy`**, and `0xmcc` doesn’t have push permission.
+
+## Why this happened
+- `git push -u origin marko` tries to push to remote `origin`.
+- `origin` is `https://github.com/followmarkobot/stashy/`.
+- GitHub rejected with `403` because current credentials/token are for another account.
+
+## Fix options
+
+- **Get access:** add `0xmcc` as collaborator to `followmarkobot/stashy`.
+- **Switch auth to owner account:** re-authenticate Git/GitHub CLI using the account that has write access.
+- **Use fork workflow:** fork repo under `0xmcc`, change `origin` to your fork, push there, then open PR.
+
+If you want, I can give you the exact command sequence for whichever route you choose (collaborator, switch account, or fork+PR).
+
+---
+
+_**User**_
+
+i dont want owner 
+
+---
+
+_**Agent (model gpt-5.3-codex, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+**Suggesting fork workflow without owner access**</details></think>
+
+---
+
+Then the right path is **fork workflow** — no owner-account login needed.
+
+## Do this instead
+
+- Fork `followmarkobot/stashy` into your own GitHub account (`0xmcc/stashy`).
+- Point your local repo `origin` to your fork.
+- Push your branch to your fork.
+- Open a PR from `0xmcc:<branch>` -> `followmarkobot:master` (or `main`, whichever default).
+
+## Command sequence
+
+```bash
+# verify current remote
+git remote -v
+
+# change origin to your fork
+git remote set-url origin https://github.com/0xmcc/stashy.git
+
+# push your branch
+git push -u origin marko
+```
+
+Then create PR (web or CLI):
+
+```bash
+gh pr create --repo followmarkobot/stashy --base master --head 0xmcc:marko
+```
+
+If `master` is wrong, switch `--base` to the repo’s default branch.
+
+This gives you preview deploys too if Vercel is set up to build PRs from the upstream repo.
+
+---
+
+_**User**_
+
+do this for me
+
+---
+
+_**Agent (model gpt-5.3-codex, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+**Planning fork workflow steps**</details></think>
+
+---
+
+I’ll set up the fork workflow end-to-end from this repo: verify current remotes/auth, point `origin` to your fork, push branch `marko`, then open a PR back to upstream. I’m checking the repo and GitHub state first.
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: ls -la "/Users/marko/.cursor/projects/Users-marko-Code-stashy/terminals"</summary>
+
+```bash
+ls -la "/Users/marko/.cursor/projects/Users-marko-Code-stashy/terminals"
+```
+
+```
+total 8
+drwxr-xr-x@ 3 marko  staff    96 Feb 18 20:52 .
+drwxr-xr-x@ 5 marko  staff   160 Feb 18 20:52 ..
+-rw-r--r--@ 1 marko  staff  2199 Feb 18 22:25 1.txt
+
+```
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git status --short --branch</summary>
+
+```bash
+git status --short --branch
+```
+
+```
+## marko
+ M .specstory/history/2026-02-19_03-43Z-x-api-integration-user-experience.md
+?? .specstory/history/2026-02-19_06-25Z-changes-commit-discussion.md
+
+```
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git remote -v</summary>
+
+```bash
+git remote -v
+```
+
+```
+origin	https://github.com/followmarkobot/stashy (fetch)
+origin	https://github.com/followmarkobot/stashy (push)
+
+```
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: gh auth status</summary>
+
+```bash
+gh auth status
+```
+
+```
+github.com
+  X Failed to log in to github.com account 0xmcc (default)
+  - Active account: true
+  - The token in default is invalid.
+  - To re-authenticate, run: gh auth login -h github.com
+  - To forget about this account, run: gh auth logout -h github.com -u 0xmcc
+
+  X Failed to log in to github.com account followmarkobot (default)
+  - Active account: false
+  - The token in default is invalid.
+  - To re-authenticate, run: gh auth login -h github.com
+  - To forget about this account, run: gh auth logout -h github.com -u followmarkobot
+
+```
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+**Checking fork existence via git**</details></think>
+
+---
+
+I found two blockers: your current `origin` still points at `followmarkobot/stashy`, and your GitHub CLI tokens are invalid. I’ll proceed with pure git remote/fork setup and test push directly from git.
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git ls-remote --heads https://github.com/0xmcc/stashy.git</summary>
+
+```bash
+git ls-remote --heads https://github.com/0xmcc/stashy.git
+```
+
+```
+fatal: could not read Username for 'https://github.com': Device not configured
+
+```
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git remote set-url origin https://github.com/0xmcc/stashy.git && git remote -v</summary>
+
+```bash
+git remote set-url origin https://github.com/0xmcc/stashy.git && git remote -v
+```
+
+```
+origin	https://github.com/0xmcc/stashy.git (fetch)
+origin	https://github.com/0xmcc/stashy.git (push)
+
+```
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+**Attempting git push with possible auth fallback**</details></think>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git push -u origin marko</summary>
+
+```bash
+git push -u origin marko
+```
+
+```
+remote: Repository not found.
+fatal: repository 'https://github.com/0xmcc/stashy.git/' not found
+
+```
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+**Handling missing fork with upstream setup**</details></think>
+
+---
+
+`origin` is now pointed to your fork URL, but push failed because `0xmcc/stashy` doesn’t exist yet. I’ll add `upstream` back to the original repo so your local setup is correct once the fork is created.
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git remote remove upstream 2>/dev/null; git remote add upstream https://github.com/followmarkobot/stashy.git; git remote -v</summary>
+
+```bash
+git remote remove upstream 2>/dev/null; git remote add upstream https://github.com/followmarkobot/stashy.git; git remote -v
+```
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+**Investigating remote add failure**</details></think>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git remote -v</summary>
+
+```bash
+git remote -v
+```
+
+```
+origin	https://github.com/0xmcc/stashy.git (fetch)
+origin	https://github.com/0xmcc/stashy.git (push)
+
+```
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+**Adding upstream simple command without redirection**</details></think>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git remote add upstream https://github.com/followmarkobot/stashy.git && git remote -v</summary>
+
+```bash
+git remote add upstream https://github.com/followmarkobot/stashy.git && git remote -v
+```
+
+```
+origin	https://github.com/0xmcc/stashy.git (fetch)
+origin	https://github.com/0xmcc/stashy.git (push)
+upstream	https://github.com/followmarkobot/stashy.git (fetch)
+upstream	https://github.com/followmarkobot/stashy.git (push)
+
+```
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+**Testing fork creation with token**</details></think>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: gh repo fork followmarkobot/stashy --remote=false</summary>
+
+```bash
+gh repo fork followmarkobot/stashy --remote=false
+```
+
+```
+failed to fork: Post "https://api.github.com/repos/followmarkobot/stashy/forks": tls: failed to verify certificate: x509: OSStatus -26276
+
+```
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+**Testing broader permission scope**</details></think>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: gh repo fork followmarkobot/stashy --remote=false</summary>
+
+```bash
+gh repo fork followmarkobot/stashy --remote=false
+```
+
+```
+https://github.com/0xmcc/stashy
+
+```
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+**Pushing updated branch**</details></think>
+
+---
+
+I was able to create the fork successfully after retrying outside the sandbox. I’m pushing your `marko` branch to the new fork now and then I’ll open the PR to the original repo.
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git push -u origin marko</summary>
+
+```bash
+git push -u origin marko
+```
+
+```
+branch 'marko' set up to track 'origin/marko'.
+remote: 
+remote: Create a pull request for 'marko' on GitHub by visiting:        
+remote:      https://github.com/0xmcc/stashy/pull/new/marko        
+remote: 
+To https://github.com/0xmcc/stashy.git
+ * [new branch]      marko -&gt; marko
+
+```
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+**Preparing upstream PR creation**</details></think>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: gh pr create --repo followmarkobot/stashy --base master --head 0xmcc:marko --title "Add X bookmarks integration branch" --body "Opening PR from fork branch marko for review and preview deployment.
+
+Made with [Cursor](https://cursor.com)"</summary>
+
+```bash
+gh pr create --repo followmarkobot/stashy --base master --head 0xmcc:marko --title "Add X bookmarks integration branch" --body "Opening PR from fork branch marko for review and preview deployment.
+
+Made with [Cursor](https://cursor.com)"
+```
+
+```
+https://github.com/followmarkobot/stashy/pull/1
+
+```
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+**Confirming completion and status**</details></think>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git remote -v</summary>
+
+```bash
+git remote -v
+```
+
+```
+origin	https://github.com/0xmcc/stashy.git (fetch)
+origin	https://github.com/0xmcc/stashy.git (push)
+upstream	https://github.com/followmarkobot/stashy.git (fetch)
+upstream	https://github.com/followmarkobot/stashy.git (push)
+
+```
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git status --short --branch</summary>
+
+```bash
+git status --short --branch
+```
+
+```
+## marko...origin/marko
+ M .specstory/history/2026-02-19_03-43Z-x-api-integration-user-experience.md
+?? .specstory/history/2026-02-19_06-25Z-changes-commit-discussion.md
+
+```
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+**Finalizing summary with PR note**</details></think>
+
+---
+
+Completed. I set up the fork workflow and pushed your branch.
+
+- Fork created: `https://github.com/0xmcc/stashy`
+- `origin` now points to your fork
+- `upstream` points to `followmarkobot/stashy`
+- Branch pushed: `marko` -> `origin/marko`
+- PR opened to upstream: `https://github.com/followmarkobot/stashy/pull/1`
+
+Current remotes:
+- `origin`: `https://github.com/0xmcc/stashy.git`
+- `upstream`: `https://github.com/followmarkobot/stashy.git`
+
+Note: you still have local uncommitted `.specstory` files; they were **not** part of the pushed PR.
+
+---
+
+_**User**_
+
+what do i need to do now for a preview vercel url?
+
+---
+
+_**Agent (model gpt-5.3-codex, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+**Confirming Vercel auto-preview possibility**</details></think>
+
+---
+
+Now that the PR exists, you’re very close.
+
+For a **Vercel preview URL**, do this:
+
+- Open the PR: `https://github.com/followmarkobot/stashy/pull/1`
+- Check for a Vercel check/comment (it usually appears in 1-3 minutes) with a **Preview** link.
+- If no link appears, go to Vercel dashboard -> project -> **Deployments** and open the latest **Preview** deployment for branch `marko`.
+
+Then make sure Preview env/OAuth is correct (this is the part that usually breaks):
+
+- In Vercel project settings, add env vars for **Preview**:
+  - `TWITTER_CLIENT_ID`
+  - `TWITTER_CLIENT_SECRET`
+  - `TWITTER_CALLBACK_URL`
+- Set `TWITTER_CALLBACK_URL` to the preview callback URL:
+  - `https://<your-preview-domain>/api/auth/twitter/callback`
+- In X Developer Portal, add that exact callback URL to your app.
+
+Important: if your preview URL changes every deploy, OAuth will keep breaking.  
+Best fix is to use a **stable staging domain** (e.g. `staging.yourdomain.com`) for preview and use that in both Vercel Preview env and X callback settings.
+
+If you want, I can give you the exact click-by-click in Vercel to assign a stable preview domain.
+
+---
+
+_**User**_
+
+vercel bot
+commented
+1 minute ago
+@0xmcc is attempting to deploy a commit to the Markobot's projects Team on Vercel.
+
+A member of the Team first needs to authorize it.
+
+---
+
+_**Agent (model gpt-5.3-codex, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+**Explaining bot comment and next steps**</details></think>
+
+---
+
+That message means your PR is fine, but Vercel is blocking deploys because your GitHub user (`0xmcc`) is not yet authorized for that Vercel team (`Markobot's projects`).
+
+What to do now:
+
+- Ask someone who is already a **Team member/admin** in that Vercel team to click **Authorize** on that PR/deployment prompt.
+- Or have them add your Vercel account to the team, then you authorize yourself.
+- After authorization, push a tiny commit (or rerun deploy) and preview URLs will generate normally.
+
+If you don’t want to depend on team approval every time, choose one of these:
+
+- Get permanent access in that Vercel team/project.
+- Or deploy from a Vercel project under your own account (linked to your fork).
+
+In short: code/setup is done; this is purely a **Vercel team permission gate**.
+
+---
+
+_**User**_
+
+i am a collaborator already do i approve deployment
+
+---
+
+_**Agent (model gpt-5.3-codex, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+**Explaining fork PR security**</details></think>
+
+---
+
+Yes — in this screen, **you should click `Approve Deployment`** *if you trust the PR contents*.
+
+That action is exactly what unlocks the fork PR preview deployment for the team project.
+
+Recommended sequence:
+
+- Click **`Review Pull Request`** first (quick sanity check).
+- Then click **`Approve Deployment`**.
+- Wait 1-2 minutes for Vercel to build, then open the new Preview URL.
+
+Why this gate exists: fork PR previews can access project build context, so Vercel requires a team member to explicitly approve before running.
+
+---
+
+_**User**_
+
+i just updated my env in vercel. do i need to do something special for the preview one
+
+---
+
+_**Agent (model gpt-5.3-codex, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+**Advising env scopes and redeploy**</details></think>
+
+---
+
+Yes — for Vercel, **Preview env vars are separate** from Production.
+
+What to do:
+
+- In Vercel project settings, set those vars under **Preview** scope (not just Production):
+  - `TWITTER_CLIENT_ID`
+  - `TWITTER_CLIENT_SECRET`
+  - `TWITTER_CALLBACK_URL`
+- Ensure `TWITTER_CALLBACK_URL` matches the preview domain callback exactly:
+  - `https://<preview-domain>/api/auth/twitter/callback`
+- After saving env vars, **redeploy the preview** (or push a tiny new commit) so the build picks up new values.
+- Since your PR shows “Authorization required,” you still need to **approve deployment** for that fork PR.
+
+One more thing from your screenshot: there are 2 Vercel checks (`stashy` and `tweet-feed`). If both are expected, set the env vars in whichever project actually runs this OAuth flow (possibly both if both build this code).
+
+---
+

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { Tweet } from "../lib/supabase";
 import TweetCard from "./TweetCard";
 import SearchBar from "./SearchBar";
@@ -39,6 +39,17 @@ export default function TweetFeed({
     isConnected,
   } = useTweetFeed(dataSource);
 
+  const handleExportJSON = useCallback(() => {
+    const json = JSON.stringify(tweets, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `tweets-export-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [tweets]);
+
   useEffect(() => {
     const node = observerRef.current;
     if (!node) return;
@@ -61,12 +72,26 @@ export default function TweetFeed({
   return (
     <div>
       {dataSource === "stash" && (
-        <SearchBar
-          onSearch={setSearch}
-          onTagFilter={setSelectedTags}
-          availableTags={availableTags}
-          selectedTags={selectedTags}
-        />
+        <div className="relative">
+          <SearchBar
+            onSearch={setSearch}
+            onTagFilter={setSelectedTags}
+            availableTags={availableTags}
+            selectedTags={selectedTags}
+          />
+          {tweets.length > 0 && (
+            <button
+              onClick={handleExportJSON}
+              title="Export feed as JSON"
+              className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1.5 rounded-full border border-[rgb(47,51,54)] bg-[rgb(22,24,28)] px-3 py-1.5 text-xs font-medium text-[rgb(113,118,123)] transition-colors hover:border-[rgb(29,155,240)] hover:text-[rgb(29,155,240)]"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Export JSON
+            </button>
+          )}
+        </div>
       )}
 
       {showConnectBanner && <XConnectBanner />}

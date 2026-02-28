@@ -222,3 +222,22 @@ export function mapXBookmarksToTweets(data: XTweet[] = [], includes: XIncludes =
     } satisfies Tweet;
   });
 }
+
+/**
+ * Re-derive link cards from a stored raw X API tweet JSON object.
+ * Used as a fallback when persisted link_cards are empty (e.g. tweets
+ * stored before link card extraction was added).
+ */
+export function deriveLinkCardsFromRawJson(rawJson: unknown): LinkCardData[] {
+  if (!rawJson || typeof rawJson !== "object") return [];
+
+  try {
+    const mapped = mapXBookmarksToTweets(
+      [rawJson] as Parameters<typeof mapXBookmarksToTweets>[0],
+      {}
+    );
+    return Array.isArray(mapped[0]?.link_cards) ? mapped[0].link_cards : [];
+  } catch {
+    return [];
+  }
+}

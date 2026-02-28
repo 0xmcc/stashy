@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { mapXBookmarksToTweets } from "./twitter";
+import { deriveLinkCardsFromRawJson } from "./twitter";
 
 let _supabase: SupabaseClient | null = null;
 
@@ -90,20 +90,6 @@ export interface LinkCardData {
 }
 
 const PAGE_SIZE = 20;
-
-function deriveLinkCardsFromRawJson(rawJson: unknown): LinkCardData[] {
-  if (!rawJson || typeof rawJson !== "object") return [];
-
-  try {
-    const mapped = mapXBookmarksToTweets(
-      [rawJson] as Parameters<typeof mapXBookmarksToTweets>[0],
-      {}
-    );
-    return Array.isArray(mapped[0]?.link_cards) ? mapped[0].link_cards : [];
-  } catch {
-    return [];
-  }
-}
 
 export async function fetchTweets(
   page: number,

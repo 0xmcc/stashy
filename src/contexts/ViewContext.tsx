@@ -1,8 +1,12 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode } from "react";
-
-export type ViewMode = "digest" | "twitter" | "facebook";
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import {
+  getStoredView,
+  saveStoredView,
+  type ViewMode,
+} from "../lib/viewPersistence";
+export type { ViewMode } from "../lib/viewPersistence";
 
 interface ViewContextType {
   view: ViewMode;
@@ -15,7 +19,13 @@ const ViewContext = createContext<ViewContextType>({
 });
 
 export function ViewProvider({ children }: { children: ReactNode }) {
-  const [view, setView] = useState<ViewMode>("digest");
+  const [view, setView] = useState<ViewMode>(() =>
+    getStoredView(typeof window !== "undefined" ? window.localStorage : null)
+  );
+
+  useEffect(() => {
+    saveStoredView(typeof window !== "undefined" ? window.localStorage : null, view);
+  }, [view]);
 
   return (
     <ViewContext.Provider value={{ view, setView }}>

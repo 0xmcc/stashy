@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import type { Tweet } from "../lib/supabase";
 import Avatar from "./Avatar";
 import MediaGrid from "./MediaGrid";
@@ -10,6 +11,10 @@ import { formatRelativeTime, parseTextWithUrls } from "../lib/utils";
 interface TweetCardProps {
   tweet: Tweet;
   onArticleClick?: (url: string, tweet: Tweet) => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (tweetId: string) => void;
+  similarityLabel?: string;
 }
 
 function formatMetric(value: number | undefined): string {
@@ -19,21 +24,30 @@ function formatMetric(value: number | undefined): string {
   return String(value);
 }
 
-export default function TweetCard({ tweet, onArticleClick }: TweetCardProps) {
+export default function TweetCard({
+  tweet,
+  onArticleClick,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
+  similarityLabel,
+}: TweetCardProps) {
   const segments = tweet.tweet_text ? parseTextWithUrls(tweet.tweet_text) : [];
 
   const handleCardClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
-    if (target.closest('a, button, [role="button"]')) return;
+    if (target.closest('a, button, input, label, [role="button"]')) return;
 
-    if (tweet.source_url) {
-      window.open(tweet.source_url, "_blank", "noopener,noreferrer");
+    if (selectable) {
+      onToggleSelect?.(tweet.tweet_id);
     }
   };
 
   return (
     <article
-      className="cursor-pointer border-b border-[rgb(47,51,54)] px-4 py-3 transition-colors hover:bg-[rgb(8,10,13)]"
+      className={`cursor-pointer border-b border-[rgb(47,51,54)] px-4 py-3 transition-colors hover:bg-[rgb(8,10,13)] ${
+        selectable ? (selected ? "opacity-100" : "opacity-50") : ""
+      }`}
       onClick={handleCardClick}
     >
       {tweet.in_reply_to_tweet_id && (
@@ -55,6 +69,29 @@ export default function TweetCard({ tweet, onArticleClick }: TweetCardProps) {
         </div>
 
         <div className="min-w-0 flex-1">
+          {(selectable || similarityLabel) && (
+            <div className="mb-2 flex items-center justify-between">
+              {selectable ? (
+                <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-[rgb(113,118,123)]">
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    onChange={() => onToggleSelect?.(tweet.tweet_id)}
+                    className="h-4 w-4"
+                  />
+                  <span className="text-xs font-semibold">Use in draft</span>
+                </label>
+              ) : (
+                <span />
+              )}
+              {similarityLabel ? (
+                <span className="rounded-full bg-[rgb(29,155,240)] bg-opacity-15 px-2 py-0.5 text-xs font-semibold text-[rgb(29,155,240)]">
+                  {similarityLabel}
+                </span>
+              ) : null}
+            </div>
+          )}
+
           <div className="flex flex-wrap items-center gap-1">
             <span className="max-w-[200px] truncate font-bold text-white">
               {tweet.author_display_name || "Unknown"}
@@ -63,18 +100,24 @@ export default function TweetCard({ tweet, onArticleClick }: TweetCardProps) {
               @{tweet.author_handle || "unknown"}
             </span>
             <span className="text-[rgb(113,118,123)]">·</span>
+            <span className="text-[rgb(113,118,123)]">{formatRelativeTime(tweet.timestamp)}</span>
             {tweet.source_url ? (
               <a
                 href={tweet.source_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[rgb(113,118,123)] hover:underline"
+                aria-label="Open tweet source"
+                className="ml-1 inline-flex items-center text-[rgb(113,118,123)] transition-colors hover:text-[rgb(29,155,240)]"
               >
-                {formatRelativeTime(tweet.timestamp)}
+                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M14 3h7v7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 14 21 3" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 14v7h-7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 10V3h7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m3 21 11-11" />
+                </svg>
               </a>
-            ) : (
-              <span className="text-[rgb(113,118,123)]">{formatRelativeTime(tweet.timestamp)}</span>
-            )}
+            ) : null}
           </div>
 
           {tweet.tweet_text && (

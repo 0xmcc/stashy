@@ -1,0 +1,262 @@
+---
+description: AI rules derived by SpecStory from the project AI interaction history
+applyTo: *
+---
+
+## PROJECT OVERVIEW
+This file defines all project rules, coding standards, workflow guidelines, references, documentation structures, and best practices for the AI coding assistant. The AI coding assistant must obey the rules defined in this file. This is a living document that evolves as the project evolves. Each time the AI coding assistant receives new user–AI interactions, any relevant new guidelines, clarifications, or decisions must be merged into this file.
+
+## CODE STYLE
+*   Follow established code style conventions for each language (e.g., PEP 8 for Python, Airbnb JavaScript Style Guide).
+*   Use consistent indentation (preferably 2 spaces for JavaScript/TypeScript, 4 spaces for Python).
+*   Write clear and concise comments to explain complex logic.
+*   Keep functions and components small and focused on a single responsibility.
+*   Use meaningful names for variables, functions, and components.
+
+## FOLDER ORGANIZATION
+*   `src/`: Contains all source code.
+*   `src/components/`: React components.
+*   `src/lib/`: Utility functions and shared logic.
+*   `src/app/api/`: API routes (Next.js).
+*   `.specstory/`: SpecStory files.
+*   `.cursor/skills/`: Project-level skills for the AI coding assistant.
+
+## TECH STACK
+*   Frontend: React, TypeScript, Next.js
+*   Backend: Node.js (Next.js API routes)
+*   Database: Supabase
+*   UI Library: [Specify UI Library if applicable]
+*   Article Extraction: @mozilla/readability
+*   HTML Parsing: jsdom
+
+## PROJECT-SPECIFIC STANDARDS
+*   **Data Fetching:** Use server-side data fetching where possible for improved performance and SEO.
+*   **Error Handling:** Implement robust error handling, including displaying user-friendly error messages.
+*   **Authentication:** [Specify authentication method, e.g., JWT, Supabase Auth]
+*   **State Management:** [Specify state management library/approach, e.g., Zustand, React Context]
+*   **Supabase:** Use the `Tweet` interface defined in `src/lib/supabase.ts` for tweet data. The `public_metrics` field is optional.
+
+```typescript
+public_metrics?: {
+  like_count: number;
+  retweet_count: number;
+  reply_count: number;
+  bookmark_count: number;
+  impression_count?: number;
+};
+```
+
+*   **Twitter API Integration:**
+    *   Use OAuth 2.0 PKCE for user authentication.
+    *   Store tokens in `httpOnly` cookies.
+    *   Handle token refresh logic.
+    *   Transform X API v2 responses to the internal `Tweet` format using `mapXBookmarksToTweets()`.
+    *   When fetching X bookmarks, use the following parameters:
+        *   `tweet.fields=created_at,public_metrics,entities,in_reply_to_user_id,conversation_id,referenced_tweets,attachments`
+        *   `expansions=author_id,attachments.media_keys,referenced_tweets.id,referenced_tweets.id.author_id`
+        *   `user.fields=name,username,profile_image_url`
+        *   `media.fields=url,preview_image_url,type,width,height`
+        *   `max_results=20 + optional pagination_token query param`
+    *   For `id` in Tweet objects returned from bookmarks, use a negative hash or prefix string since Supabase `id` is numeric and these won't be in DB. Use `tweet_id` as the React key.
+*   **Article Extraction:**
+    *   Use `@mozilla/readability` and `jsdom` for article extraction.
+    *   Implement graceful fallback if extraction fails.
+*   **Link Handling:**
+    *   Use the `onArticleClick` prop in `TweetCard` and `LinkCard` to handle link clicks and open articles in the in-app reader.
+*   **Environment Variables:**
+    *   `TWITTER_CLIENT_ID`: Consumer Key (aka API Key)
+    *   `TWITTER_CLIENT_SECRET`: Secret Key (aka API Key Secret / Consumer Secret)
+    *   `TWITTER_CALLBACK_URL`: Callback URI / Redirect URL (required)
+    *   **Important:** Ensure the `TWITTER_CALLBACK_URL` is correctly configured in both your `.env.local` file and your X Developer Portal app settings. A mismatch can cause authentication errors. In development, if the app runs on a port other than 3000 (e.g., 3001), the callback URL must reflect this (e.g., `http://localhost:3001/api/auth/twitter/callback`).
+*   **X API Bookmarks Persistence:** Tweets fetched via the X API bookmarks endpoint must be persisted in the database. These tweets should only be readable by the user who owns the bookmarks. The bookmarks are upserted into the `public.x_bookmark_tweets` table, scoped by owner, using a composite key of `(owner_x_user_id, tweet_id)`.
+*   **X API Bookmarks Error Handling:** If persistence to the database fails during `/api/twitter/bookmarks`, ensure this failure is non-blocking so bookmarks still return to the client. Implement robust error reporting to track and diagnose database issues without interrupting the user experience. If X returns quota/rate-limit errors, the route must fall back to cached bookmarks from the DB instead of returning empty.
+*   **Data Model and Visibility:**
+    *   Tweets are part of collections. Collections have different visibility levels and they belong to users. So long as a tweet is in a public collection, it can be viewed globally. Even if it's also part of private collections.
+    *   **Collections Model:**
+        *   `tweets` (canonical content, one row per `tweet_id`, globally deduped)
+        *   `collections` (`id`, `owner_user_id`, `name`, `slug`, `visibility` enum: `private|public|unlisted`, `is_system` boolean, timestamps, `UNIQUE(owner_user_id, slug)`)
+        *   `collection_tweets` (`collection_id`, `tweet_id`, `added_by_user_id`, timestamps, `UNIQUE(collection_id, tweet_id)`)
+    *   **Visibility Rule:** Viewer can see tweet if:
+        *   it belongs to any `public` collection, **or**
+        *   it belongs to a private collection they own / are allowed to access.
+        *   Visibility is **not** stored on tweet rows; it’s derived from join rows.
+    *   **Bookmarks as Private Collection:** Each user's collection of bookmarks is just a private collection. A user’s “bookmarks” should be modeled as just another collection row with:
+        *   `owner_user_id = <that user>`
+        *   `kind = 'bookmarks'` (or `is_system = true` + slug)
+        *   `visibility = 'private'`
+    *   Bookmarks should be treated like any other collection membership:
+        *   tweet goes into canonical `tweets`
+        *   association goes into `collection_tweets`
+        *   visibility is resolved from collection membership rules
+    *   **Collections Model Implementation Plan (DO NOT SHIP AS-IS):**
+        *   tweets is a canonical, globally-deduplicated table (one row per tweet_id)
+        *   collections owns visibility and user scope
+        *   collection_tweets is the join table; user-specific data (tags, notes) lives here
+        *   A user's X bookmarks = their private system collection (is_system=true, slug='bookmarks')
+        *   Tweet visibility is derived from collection membership, not tweet rows
+    *   **Critical files for Collections Model (DO NOT SHIP AS-IS):**
+        *   `supabase/sql/collections.sql`: New tables: collections + collection_tweets, indexes, RLS
+        *   `supabase/sql/tweets-canonical.sql`: Add UNIQUE(tweet_id) to existing tweets table
+        *   `supabase/sql/x-bookmark-tweets.sql`: Superseded Drop x_bookmark_tweets table (staging approach replaced)
+        *   `src/app/api/twitter/bookmarks/route.ts`: Modify Replace persistBookmarksForOwner with canonical upsert + collection write
+        *   `src/lib/supabase.ts`: Modify Add Collection + CollectionTweet TypeScript types
+    *   **Known Issues with Collections Model Implementation Plan (DO NOT SHIP AS-IS):**
+        *   `tweets_tweet_id` uniqueness already exists in your live DB (`tweets_tweet_id_key`).
+        *   Route upsert payload doesn’t match current tweets schema. Your proposed upsert includes quoted_tweet and public_metrics, but those columns are not in the current public.tweets table.
+        *   RLS/revoke plan conflicts with current app read path. src/lib/supabase.ts reads tweets directly from client using anon key. If you revoke anon/authenticated on new tables (and eventually tweets), current client-side reads won’t work unless you move reads server-side or add explicit safe policies.
+        *   Visibility behavior is not implemented yet. Plan states “public collection => globally visible,” but no query layer/view/policy is defined to enforce that at read time.
+        *   The `tweets-canonical.sql` idempotency check is too narrow: it checks constraint name, not existing uniqueness on column set. You already have `tweets_tweet_id_key`; this script may create a redundant second unique constraint or fail unexpectedly. Check by column/index definition, not by `conname = 'tweets_tweet_id_unique'`.
+        *   The route still references optional columns not in live schema (`quoted_tweet`, `public_metrics`). This must be hard-gated in implementation (omit now or add migration first).
+        *   The read-path is still not wired. You defined the visibility query, but until app reads switch to it, behavior won’t reflect collection visibility rules.
+        *   The security posture of the `tweets` table is still broad/no-RLS in your environment. That’s acceptable for this phase only if you explicitly accept temporary exposure risk.
+*   **Test-Driven Development (TDD):** Before implementing bug fixes or new features, write failing tests first. This enforces a "red-green-refactor" cycle. The AI coding assistant should load the `.cursor/skills/test-first-development/SKILL.md` skill before coding bug fixes/features. This enforces the sequence: tests first, confirm failing, minimal implementation, confirm passing. Skipping should only be allowed when explicitly requested.
+*   **Search Strategies:** Implement both fast keyword searches and slower embedded searches. Integrate the slower embedded results into the initial keyword search results in a way that does not introduce UI jank.
+*   **Tab Persistence:** The application should remember the selected tab (Facebook, Twitter, or Digest) in local storage so it is restored on reload.
+*   **Conversational Chat:** Implement a conversational chat feature that allows users to ask questions based on selected tweets and receive responses based on the content of those tweets. This is in addition to the existing tweet generation functionality.
+    *   The refined input bar in `SemanticSearch.jsx` should behave like a chat input field. User input should always send a message into the chat history. AI draft suggestions should be embedded inside assistant messages, not in a separate draft slot. The "Write tweet from selected" functionality should be retained as an optional prompt starter.
+*   **Tweet Selection Interaction:**
+    *   Clicking a tweet should toggle whether it's selected or not. When semantic search is active, clicking a tweet should toggle its selection state.
+    *   Add a small icon to each tweet to open the original source URL in a new tab.
+    *   Selected tweets should have full opacity, while unselected tweets should have 50% opacity.
+    *   Implement "Select All" and "Deselect All" buttons at the top of the tweet feed when semantic search is active.
+    *   Semantic mode should always be on. The whole collection should be part of the search by default. Everything starts selected by default. Search then becomes a refinement/ranking layer, not an on/off switch for semantic behavior.
+    *   When semantic search is active, the tweet row click behavior now toggles selection state (selected/unselected) instead of navigating away.
+        *   Logic is in `src/components/TweetCard.tsx` (`handleCardClick` calls `onToggleSelect`).
+        *   It’s active when semantic selection mode is on (via `selectable` from `TweetFeed`).
+    *   **Semantic Search Visibility:** Semantic search should always be visible. Remove the toggle button for it.
+*   **X API Usage:**
+    *   Ensure the app doesn't call the X API every single time to get bookmarks. Space out the calls to avoid duplicative fetching of the same tweets, to conserve quota.
+    *   Serve cached bookmarks from DB by default.
+    *   Sync with X only if `last_sync_at` is older than a TTL (e.g. 15–60 min).
+    *   Add per-user in-flight lock so multiple tabs/refreshes don’t trigger parallel syncs.
+    *   On 429/credits, set cooldown and skip live sync attempts until cooldown expires.
+    *   Add a manual `Refresh from X` button for explicit sync.
+*   **Bookmark Sync Status:** The UI should include an indicator that gives the status on DB persistence. It should expose relevant info so we can know what's happening if there's an issue.
+    *   The sync status model includes:
+        *   state: `syncing | success | error`
+        *   summary
+        *   fetched/persisted/canonical counts
+        *   collection id
+        *   retry-without-optional-fields flag
+        *   error details
+    *   Success response from `/api/twitter/bookmarks/sync` includes structured persistence telemetry:
+        *   `status`
+        *   `fetched_count`
+        *   `persisted_count`
+        *   `canonical_upserted`
+        *   `bookmarks_collection_id`
+        *   `retried_without_optional_fields`
+        *   `next_token`
+        *   `used_legacy_owner_column` (true/false)
+    *   Error response from  `/api/twitter/bookmarks/sync` includes `details` for debugging.
+*   **Bookmarks Tab Data Source:** The `X Bookmarks` tab reads **only cached/persisted bookmarks** from `collections` + `collection_tweets` + `tweets` via `GET /api/twitter/bookmarks` in `src/app/api/twitter/bookmarks/route.ts`. Live X fetch only happens when you click **Sync Bookmarks** (`POST /api/twitter/bookmarks/sync`). The bookmarks tab returns empty when collection lookup/membership lookup fails (it doesn’t surface a loud error in UI). The empty-state copy should say “No cached bookmarks found” instead of “No bookmarks returned from X”. `My Stash` reads directly from `tweets` via `fetchTweets(...)` in `src/lib/supabase.ts`.
+*   **Collections Table Requirement:** The `collections` and `collection_tweets` tables are required for the `X Bookmarks` tab to function correctly. If these tables do not exist, the tab will be empty. To create these tables, run the SQL from `supabase/sql/collections.sql` in your Supabase SQL editor (or apply via your migration flow). Ensure `gen_random_uuid()` works (usually `pgcrypto` is enabled; if not, enable it).
+*   **fetchTweetById Error Handling:** When fetching tweets by ID, especially for quoted tweets, use `.maybeSingle()` instead of `.single()` in `fetchTweetById` in `src/lib/supabase.ts` to handle the case where a quoted tweet row is missing. This prevents Supabase/PostgREST from returning `406 Not Acceptable` errors and converts the error into a clean `null` return.
+
+## WORKFLOW & RELEASE RULES
+*   **Branching:** Use feature branches for new features or bug fixes.
+*   **Pull Requests:** Create pull requests for all code changes.
+*   **Code Review:** All code must be reviewed before being merged.
+*   **Testing:** Write unit tests and integration tests to ensure code quality.
+*   **Deployment:** Use Vercel for deployment.
+    *   Connect the GitHub repository to Vercel.
+    *   Push code to the linked branch to trigger automatic deployments.
+    *   Preview env vars are separate from Production env vars in Vercel.
+*   **Vercel Preview Deployments:**
+    *   Create a non-production branch (e.g., `feature/x-bookmarks`).
+    *   Each push to that branch gets an automatic Preview Deployment URL.
+    *   For X OAuth to work on preview, add the exact preview domain callback.
+    *   Callback format: `https://<preview-domain>/api/auth/twitter/callback`
+    *   Set `TWITTER_CALLBACK_URL` in Vercel **Preview** env scope to that URL.
+    *   It is best practice to use a stable preview domain (e.g. `staging.yourdomain.com`) mapped to Vercel preview/staging.
+    *   Register that stable domain once in X app.
+    *   Set `TWITTER_CALLBACK_URL` (Preview env) to `https://staging.yourdomain.com/api/auth/twitter/callback`.
+*   **Fork Workflow**
+    *   If you don't have write access to the main repository, use the fork workflow:
+        *   Fork the repository into your own GitHub account.
+        *   Point your local repo `origin` to your fork.
+        *   Push your branch to your fork.
+        *   Open a PR from `<your-account>:<branch>` -> `<original-repo>:master` (or `main`, whichever default).
+    *   After creating the fork, point your local repository to the fork:
+    ```bash
+    git remote set-url origin https://github.com/<your-account>/<repo-name>.git
+    ```
+    *   Add the original repository as `upstream`:
+    ```bash
+    git remote add upstream https://github.com/<original-repo>/<repo-name>.git
+    ```
+    *   To update your fork with the latest changes from the original repository:
+    ```bash
+    git fetch upstream
+    git merge upstream/master
+    git push
+    ```
+    *   When a pull request is created from a fork, Vercel requires a team member to explicitly approve the deployment before running. Click `Approve Deployment` if you trust the PR contents after reviewing the code.
+*   **Release Gating:** The Collections Model implementation plan should **NOT** be shipped as-is.
+    *   Specifically, the Collections Model implementation plan outlined in the "Collections Model Implementation Plan (DO NOT SHIP AS-IS)" section should not be shipped as-is. Minimum before ship: fix schema/route column mismatch, make migration idempotent, and define/implement the actual visibility read path.
+    *   The Collections Model implementation plan should not be shipped until the following are addressed:
+        *   The `tweets-canonical.sql` idempotency check is too narrow: it checks constraint name, not existing uniqueness on column set.  The check should be for an existing unique constraint/index on `tweet_id` by definition, not name.
+        *   The route still references optional columns not in live schema (`quoted_tweet`, `public_metrics`). This must be hard-gated in implementation (omit now or add migration first).
+        *   The read-path still needs to be wired.  Until `fetchTweets`/read APIs use it, product behavior will still be wrong. This must be in rollout scope, not “later”.
+        *   The security posture of the `tweets` table is still broad/no-RLS in your environment.
+        *   The plan needs an explicit `x_bookmark_tweets` decommission trigger. Add hard criteria (e.g., N successful syncs, no reads from staging for 7 days, no errors) before drop.
+    *   Step 1/2/3 in the bookmarks route should be transactional (or retriable with compensating behavior). Otherwise you can get tweet inserted without membership row, or collection created without membership rows in `collection_tweets`, or collection created without links.
+*   **Merging and Pushing Code:**
+    *   Before merging, ensure all changes are committed.
+    *   The default branch is `master`.
+    *   The AI can commit changes, merge branches, and push to GitHub after user confirmation. The user must provide the commit message and the remote to push to (`origin` or `upstream`).
+*   **Medium-to-Large Tasks:** When given medium-to-large sized tasks, the AI should provide a todo list at the end of the response listing the remaining tasks that were not yet completed.
+
+## REFERENCE EXAMPLES
+*   **X API v2 field mappings to Tweet field:**
+
+```
+X API v2 field	Tweet field
+id	tweet_id
+text	tweet_text
+created_at	timestamp
+includes.users[author_id].name	author_display_name
+includes.users[author_id].username	author_handle
+includes.users[author_id].profile_image_url	author_avatar_url
+public_metrics	public_metrics (new field)
+attachments.media_keys → includes.media	media[]
+entities.urls (non-twitter urls)	link_cards[] (url+display_url only; no OG enrichment in live mode)
+referenced_tweets[type=quoted] → includes.tweets	quoted_tweet
+in_reply_to_user_id (non-null)	in_reply_to_tweet_id (use as proxy)
+id (Twitter URL)	source_url = https://x.com/${handle}/status/${id}
+```
+
+## PROJECT DOCUMENTATION & CONTEXT SYSTEM
+*   Use SpecStory to document features and user stories.
+*   Keep documentation up-to-date with code changes.
+*   Document all API endpoints and data structures.
+
+## DEBUGGING
+*   Use console.log() for debugging in development.
+*   Use browser developer tools to inspect network requests and application state.
+*   Implement error logging to track errors in production.
+*   If the callback fails during OAuth, 90% of the time it’s a callback URL mismatch or missing env var in Vercel.
+*   **OAuth Callback 404:** If you encounter a 404 error after signing in with X, it's often due to a mismatch between the `TWITTER_CALLBACK_URL` configured in your environment and the URL registered in your X Developer Portal. Also, verify that the Next.js development server is running on the port you expect, and that the callback URL reflects this port.
+*   When debugging issues with the Twitter X API, ALWAYS run tests to reproduce the bug before attempting to fix it. Test must fail first.
+*   **Supabase Table Verification:** Use the following queries in the Supabase SQL editor to verify the existence and contents of the `collections` and `collection_tweets` tables:
+
+```sql
+select to_regclass('public.collections') as collections_table,
+       to_regclass('public.collection_tweets') as collection_tweets_table;
+```
+
+```sql
+select count(*) from public.collections;
+select count(*) from public.collection_tweets;
+```
+
+After syncing bookmarks once, you should see rows in both.
+*   **406 (Not Acceptable) Errors:** When encountering 406 errors related to Supabase queries, especially when fetching tweets by ID, ensure that the code handles the case where a quoted tweet row is missing. Use `.maybeSingle()` instead of `.single()` in `fetchTweetById` to handle missing data gracefully. Write tests to reproduce the bug before attempting to fix it.
+
+## FINAL DOs AND DON'Ts
+*   **DO** follow the coding standards and guidelines outlined in this file.
+*   **DO** write clear and concise code.
+*   **DO** test your code thoroughly.
+*   **DON'T** commit code without review.
+*   **DON'T** leave commented-out code in the codebase.
+*   **ALWAYS** run tests to reproduce the reported problem before trying to fix it. Test must fail first.

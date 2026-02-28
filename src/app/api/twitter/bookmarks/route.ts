@@ -1,142 +1,132 @@
 import { NextRequest, NextResponse } from "next/server";
-import { mapXBookmarksToTweets } from "@/lib/twitter";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 
-interface BookmarkResponse {
-  data?: unknown[];
-  includes?: {
-    users?: unknown[];
-    media?: unknown[];
-    tweets?: unknown[];
-  };
-  meta?: {
-    next_token?: string;
-  };
-}
+const PAGE_SIZE = 20;
 
-interface RefreshResponse {
-  access_token: string;
-  refresh_token?: string;
-  expires_in?: number;
-}
+let _serviceSupabase: SupabaseClient | null = null;
 
-function getTokenRequestHeaders(clientId: string, clientSecret?: string): HeadersInit {
-  const headers: HeadersInit = {
-    "Content-Type": "application/x-www-form-urlencoded",
-  };
+function getServiceSupabase(): SupabaseClient | null {
+  if (_serviceSupabase) return _serviceSupabase;
 
-  if (clientSecret) {
-    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
-    headers.Authorization = `Basic ${credentials}`;
-  }
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  return headers;
-}
-
-async function fetchBookmarks(accessToken: string, userId: string, cursor?: string | null) {
-  const url = new URL(`https://api.x.com/2/users/${userId}/bookmarks`);
-  url.searchParams.set(
-    "tweet.fields",
-    "created_at,public_metrics,entities,in_reply_to_user_id,conversation_id,referenced_tweets,attachments"
-  );
-  url.searchParams.set(
-    "expansions",
-    "author_id,attachments.media_keys,referenced_tweets.id,referenced_tweets.id.author_id"
-  );
-  url.searchParams.set("user.fields", "name,username,profile_image_url");
-  url.searchParams.set("media.fields", "url,preview_image_url,type,width,height");
-  url.searchParams.set("max_results", "20");
-
-  if (cursor) {
-    url.searchParams.set("pagination_token", cursor);
-  }
-
-  const response = await fetch(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-    cache: "no-store",
-  });
-
-  if (response.status === 401) {
-    return { unauthorized: true as const, payload: null };
-  }
-
-  if (!response.ok) {
-    const details = await response.text();
-    throw new Error(`Bookmarks fetch failed: ${details}`);
-  }
-
-  return {
-    unauthorized: false as const,
-    payload: (await response.json()) as BookmarkResponse,
-  };
-}
-
-async function refreshAccessToken(refreshToken: string): Promise<RefreshResponse | null> {
-  const clientId = process.env.TWITTER_CLIENT_ID;
-  const clientSecret = process.env.TWITTER_CLIENT_SECRET;
-
-  if (!clientId) return null;
-
-  const body = new URLSearchParams({
-    grant_type: "refresh_token",
-    refresh_token: refreshToken,
-    client_id: clientId,
-  });
-
-  const response = await fetch("https://api.x.com/2/oauth2/token", {
-    method: "POST",
-    headers: getTokenRequestHeaders(clientId, clientSecret),
-    body,
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
+  if (!url || !serviceKey) {
     return null;
   }
 
-  return (await response.json()) as RefreshResponse;
+  _serviceSupabase = createClient(url, serviceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+
+  return _serviceSupabase;
 }
 
-function setRefreshedCookies(
-  response: NextResponse,
-  refreshed: RefreshResponse,
-  refreshTokenFallback: string
-) {
-  const secure = process.env.NODE_ENV === "production";
-  const expiresIn = refreshed.expires_in ?? 7200;
+function parseCursor(cursor: string | null): number {
+  if (!cursor) return 0;
+  const parsed = Number(cursor);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
+}
 
-  response.cookies.set("x_access_token", refreshed.access_token, {
-    httpOnly: true,
-    secure,
-    sameSite: "lax",
-    maxAge: expiresIn,
-    path: "/",
-  });
+async function fetchBookmarksCollectionId(
+  supabase: SupabaseClient,
+  ownerUserId: string
+): Promise<string | null> {
+  const modern = await supabase
+    .from("collections")
+    .select("id")
+    .eq("owner_user_id", ownerUserId)
+    .eq("slug", "bookmarks")
+    .maybeSingle();
 
-  response.cookies.set("x_refresh_token", refreshed.refresh_token || refreshTokenFallback, {
-    httpOnly: true,
-    secure,
-    sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 90,
-    path: "/",
-  });
+  if (!modern.error && modern.data?.id) {
+    return modern.data.id as string;
+  }
 
-  response.cookies.set("x_expires_at", String(Date.now() + expiresIn * 1000), {
-    httpOnly: true,
-    secure,
-    sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 90,
-    path: "/",
-  });
+  const legacy = await supabase
+    .from("collections")
+    .select("id")
+    .eq("owner_x_user_id", ownerUserId)
+    .eq("slug", "bookmarks")
+    .maybeSingle();
+
+  if (legacy.error || !legacy.data?.id) {
+    return null;
+  }
+
+  return legacy.data.id as string;
+}
+
+async function fetchPersistedBookmarksPage(ownerXUserId: string, cursor: string | null) {
+  const supabase = getServiceSupabase();
+  if (!supabase) {
+    return { tweets: [], next_token: null };
+  }
+
+  const collectionId = await fetchBookmarksCollectionId(supabase, ownerXUserId);
+  if (!collectionId) {
+    return { tweets: [], next_token: null };
+  }
+
+  const offset = parseCursor(cursor);
+  const end = offset + PAGE_SIZE - 1;
+  const { data: membershipRows, error: membershipError } = await supabase
+    .from("collection_tweets")
+    .select("tweet_id")
+    .eq("collection_id", collectionId)
+    .order("added_at", { ascending: false })
+    .range(offset, end);
+
+  if (membershipError || !membershipRows?.length) {
+    return { tweets: [], next_token: null };
+  }
+
+  const orderedIds = membershipRows
+    .map((row) => row.tweet_id)
+    .filter((tweetId): tweetId is string => Boolean(tweetId));
+  if (!orderedIds.length) {
+    return { tweets: [], next_token: null };
+  }
+
+  const { data: tweetRows, error: tweetsError } = await supabase
+    .from("tweets")
+    .select("*")
+    .in("tweet_id", orderedIds);
+
+  if (tweetsError || !tweetRows?.length) {
+    return { tweets: [], next_token: null };
+  }
+
+  const byId = new Map(
+    tweetRows.map((row) => [
+      row.tweet_id as string,
+      {
+        ...row,
+        media: Array.isArray(row.media) ? row.media : [],
+        link_cards: Array.isArray(row.link_cards) ? row.link_cards : [],
+        tags: Array.isArray(row.tags) ? row.tags : [],
+      },
+    ])
+  );
+
+  const tweets = orderedIds
+    .map((tweetId) => byId.get(tweetId))
+    .filter((tweet): tweet is Record<string, unknown> => Boolean(tweet));
+
+  return {
+    tweets,
+    next_token: membershipRows.length === PAGE_SIZE ? String(offset + PAGE_SIZE) : null,
+  };
 }
 
 export async function GET(request: NextRequest) {
   const cursor = request.nextUrl.searchParams.get("cursor");
   const accessTokenCookie = request.cookies.get("x_access_token")?.value;
-  const refreshTokenCookie = request.cookies.get("x_refresh_token")?.value;
   const userId = request.cookies.get("x_user_id")?.value;
 
   if (!accessTokenCookie || !userId) {
@@ -144,51 +134,12 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    let accessToken = accessTokenCookie;
-    let responsePayload = await fetchBookmarks(accessToken, userId, cursor);
-    let refreshedToken: RefreshResponse | null = null;
-
-    if (responsePayload.unauthorized) {
-      if (!refreshTokenCookie) {
-        return NextResponse.json({ error: "X token expired." }, { status: 401 });
-      }
-
-      refreshedToken = await refreshAccessToken(refreshTokenCookie);
-      if (!refreshedToken?.access_token) {
-        return NextResponse.json({ error: "Unable to refresh X token." }, { status: 401 });
-      }
-
-      accessToken = refreshedToken.access_token;
-      responsePayload = await fetchBookmarks(accessToken, userId, cursor);
-
-      if (responsePayload.unauthorized) {
-        return NextResponse.json({ error: "X token is unauthorized." }, { status: 401 });
-      }
-    }
-
-    if (!responsePayload.payload) {
-      return NextResponse.json({ tweets: [], next_token: null });
-    }
-
-    const tweets = mapXBookmarksToTweets(
-      responsePayload.payload.data as Parameters<typeof mapXBookmarksToTweets>[0],
-      responsePayload.payload.includes as Parameters<typeof mapXBookmarksToTweets>[1]
-    );
-
-    const result = NextResponse.json({
-      tweets,
-      next_token: responsePayload.payload.meta?.next_token ?? null,
-    });
-
-    if (refreshedToken && refreshTokenCookie) {
-      setRefreshedCookies(result, refreshedToken, refreshTokenCookie);
-    }
-
-    return result;
+    const result = await fetchPersistedBookmarksPage(userId, cursor);
+    return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    console.error("Bookmarks route error:", error);
+    console.error("Bookmarks cache route error:", error);
     return NextResponse.json(
-      { error: "Failed to fetch bookmarks from X." },
+      { error: "Failed to load cached bookmarks." },
       { status: 500 }
     );
   }

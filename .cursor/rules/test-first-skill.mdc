@@ -1,0 +1,14 @@
+---
+description: Require test-first skill for feature and bug work
+applyTo: *
+---
+
+Before implementing any bug fix, feature, or behavior change, load and follow `.cursor/skills/test-first-development/SKILL.md`.
+
+Execution order is mandatory:
+1. Write or update tests first.
+2. Run tests and confirm failure for the intended reason.
+3. Implement the minimal production change.
+4. Re-run tests and confirm pass.
+
+Only skip this flow if the user explicitly instructs to bypass tests.

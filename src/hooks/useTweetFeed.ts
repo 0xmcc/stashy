@@ -8,6 +8,35 @@ interface BookmarksPayload {
     next_token: string | null;
 }
 
+interface BookmarkSyncSuccessPayload {
+    status: "ok";
+    fetched_count: number;
+    persisted_count: number;
+    canonical_upserted: number;
+    bookmarks_collection_id: string;
+    retried_without_optional_fields: boolean;
+    used_legacy_owner_column: boolean;
+    next_token: string | null;
+}
+
+interface BookmarkSyncErrorPayload {
+    error: string;
+    details?: string;
+}
+
+interface BookmarkSyncStatus {
+    state: "syncing" | "success" | "error";
+    summary: string;
+    fetchedCount?: number;
+    persistedCount?: number;
+    canonicalUpserted?: number;
+    bookmarksCollectionId?: string;
+    retriedWithoutOptionalFields?: boolean;
+    usedLegacyOwnerColumn?: boolean;
+    errorDetails?: string;
+    updatedAt: string;
+}
+
 export function useTweetFeed(dataSource: "stash" | "bookmarks") {
     const { isConnected, isChecking, checkStatus } = useXAuth();
 
@@ -20,6 +49,7 @@ export function useTweetFeed(dataSource: "stash" | "bookmarks") {
     const [search, setSearch] = useState("");
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
     const [availableTags, setAvailableTags] = useState<string[]>([]);
+    const [bookmarkSyncStatus, setBookmarkSyncStatus] = useState<BookmarkSyncStatus | null>(null);
 
     const searchRef = useRef(search);
     const tagsRef = useRef(selectedTags);
@@ -129,6 +159,64 @@ export function useTweetFeed(dataSource: "stash" | "bookmarks") {
         loadBookmarkTweets(cursor, true);
     }, [loading, hasMore, dataSource, page, loadStashTweets, isConnected, cursor, loadBookmarkTweets]);
 
+    const refreshBookmarks = useCallback(async () => {
+        if (dataSource !== "bookmarks" || !isConnected) return;
+        setPage(0);
+        setCursor(null);
+        setHasMore(true);
+        setInitialLoading(true);
+        setBookmarkSyncStatus({
+            state: "syncing",
+            summary: "Syncing bookmarks from X and persisting to database...",
+            updatedAt: new Date().toISOString(),
+        });
+        try {
+            const syncResponse = await fetch("/api/twitter/bookmarks/sync", {
+                method: "POST",
+                cache: "no-store",
+            });
+            const payload = (await syncResponse.json()) as
+                | BookmarkSyncSuccessPayload
+                | BookmarkSyncErrorPayload;
+
+            if (!syncResponse.ok) {
+                setBookmarkSyncStatus({
+                    state: "error",
+                    summary: payload.error || "Bookmark sync failed.",
+                    errorDetails:
+                        "details" in payload && payload.details ? payload.details : undefined,
+                    updatedAt: new Date().toISOString(),
+                });
+            } else {
+                const success = payload as BookmarkSyncSuccessPayload;
+                setBookmarkSyncStatus({
+                    state: "success",
+                    summary: `Synced ${success.fetched_count} from X. Persisted ${success.persisted_count} collection entries.`,
+                    fetchedCount: success.fetched_count,
+                    persistedCount: success.persisted_count,
+                    canonicalUpserted: success.canonical_upserted,
+                    bookmarksCollectionId: success.bookmarks_collection_id,
+                    retriedWithoutOptionalFields: success.retried_without_optional_fields,
+                    usedLegacyOwnerColumn: success.used_legacy_owner_column,
+                    updatedAt: new Date().toISOString(),
+                });
+            }
+
+            if (!syncResponse.ok && syncResponse.status === 401) {
+                await checkStatus();
+            }
+        } catch (error) {
+            console.error("Failed to sync bookmarks from X:", error);
+            setBookmarkSyncStatus({
+                state: "error",
+                summary: "Bookmark sync request failed.",
+                errorDetails: error instanceof Error ? error.message : "Unknown error",
+                updatedAt: new Date().toISOString(),
+            });
+        }
+        await loadBookmarkTweets(null, false);
+    }, [dataSource, isConnected, loadBookmarkTweets, checkStatus]);
+
     return {
         tweets,
         loading,
@@ -140,6 +228,8 @@ export function useTweetFeed(dataSource: "stash" | "bookmarks") {
         setSelectedTags,
         availableTags,
         loadMore,
+        refreshBookmarks,
+        bookmarkSyncStatus,
         isChecking,
         isConnected,
     };

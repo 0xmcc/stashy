@@ -55,6 +55,25 @@ export interface Tweet {
   };
 }
 
+export interface Collection {
+  id: string;
+  owner_user_id: string;
+  name: string;
+  slug: string;
+  visibility: "private" | "public" | "unlisted";
+  is_system: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CollectionTweet {
+  collection_id: string;
+  tweet_id: string;
+  tags: string[];
+  notes: string | null;
+  added_at: string;
+}
+
 export interface MediaItem {
   type: "image" | "video" | "gif";
   url: string;
@@ -114,7 +133,7 @@ export async function fetchTweetById(
     .from("tweets")
     .select("*")
     .eq("tweet_id", tweetId)
-    .single();
+    .maybeSingle();
 
   if (error || !data) return null;
 

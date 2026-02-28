@@ -8,6 +8,7 @@ import MediaGrid from "./MediaGrid";
 import LinkCard from "./LinkCard";
 import QuoteTweet from "./QuoteTweet";
 import { formatRelativeTime, parseTextWithUrls } from "../lib/utils";
+import { formatMetric } from "../lib/tweetFormatting";
 
 interface TweetCardProps {
   tweet: Tweet;
@@ -16,13 +17,6 @@ interface TweetCardProps {
   selected?: boolean;
   onToggleSelect?: (tweetId: string) => void;
   similarityLabel?: string;
-}
-
-function formatMetric(value: number | undefined): string {
-  if (value === undefined) return "0";
-  if (value >= 1000000) return `${(value / 1000000).toFixed(1).replace(/\.0$/, "")}M`;
-  if (value >= 1000) return `${(value / 1000).toFixed(1).replace(/\.0$/, "")}K`;
-  return String(value);
 }
 
 function clamp(value: number, min: number, max: number): number {

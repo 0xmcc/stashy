@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { mapXBookmarksToTweets } from "@/lib/twitter";
-import type { LinkCardData } from "@/lib/supabase";
+import { toArray } from "@/lib/arrayGuards";
+import { PAGE_SIZE } from "@/lib/constants";
+import type { MediaItem, LinkCardData } from "@/lib/supabase";
 
 export const runtime = "nodejs";
-
-const PAGE_SIZE = 20;
 
 function deriveLinkCardsFromRawJson(rawJson: unknown): LinkCardData[] {
   if (!rawJson || typeof rawJson !== "object") return [];
@@ -15,7 +15,7 @@ function deriveLinkCardsFromRawJson(rawJson: unknown): LinkCardData[] {
       [rawJson] as Parameters<typeof mapXBookmarksToTweets>[0],
       {}
     );
-    return Array.isArray(mapped[0]?.link_cards) ? mapped[0].link_cards : [];
+    return toArray(mapped[0]?.link_cards);
   } catch {
     return [];
   }
@@ -119,19 +119,18 @@ async function fetchPersistedBookmarksPage(ownerXUserId: string, cursor: string 
   }
 
   const byId = new Map(
-    tweetRows.map((row) => [
-      row.tweet_id as string,
-      {
-        ...row,
-        media: Array.isArray(row.media) ? row.media : [],
-        link_cards: (() => {
-          const persisted = Array.isArray(row.link_cards) ? row.link_cards : [];
-          if (persisted.length > 0) return persisted;
-          return deriveLinkCardsFromRawJson(row.raw_json);
-        })(),
-        tags: Array.isArray(row.tags) ? row.tags : [],
-      },
-    ])
+    tweetRows.map((row) => {
+      const persistedCards = toArray<LinkCardData>(row.link_cards);
+      return [
+        row.tweet_id as string,
+        {
+          ...row,
+          media: toArray<MediaItem>(row.media),
+          link_cards: persistedCards.length > 0 ? persistedCards : deriveLinkCardsFromRawJson(row.raw_json),
+          tags: toArray<string>(row.tags),
+        },
+      ] as const;
+    })
   );
 
   const tweets = orderedIds

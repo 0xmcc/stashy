@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabase, LinkCardData } from "@/lib/supabase";
+import { toArray } from "@/lib/arrayGuards";
 
 interface TweetRow {
   id: number;
@@ -144,9 +145,7 @@ export async function POST() {
   };
 
   for (const tweet of tweets) {
-    const cards = Array.isArray(tweet.link_cards)
-      ? tweet.link_cards
-      : [];
+    const cards = toArray<LinkCardData>(tweet.link_cards);
 
     let didUpdate = false;
     const updatedCards: LinkCardData[] = [];

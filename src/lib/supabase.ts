@@ -108,7 +108,7 @@ function deriveLinkCardsFromRawJson(rawJson: unknown): LinkCardData[] {
       [rawJson] as Parameters<typeof mapXBookmarksToTweets>[0],
       {}
     );
-    return Array.isArray(mapped[0]?.link_cards) ? mapped[0].link_cards : [];
+    return toArray(mapped[0]?.link_cards);
   } catch {
     return [];
   }

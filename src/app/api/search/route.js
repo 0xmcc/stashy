@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { createClient } from "@supabase/supabase-js";
+import { getServiceSupabase } from "@/lib/supabaseServer";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -27,17 +27,12 @@ function normalizeMode(modeParam) {
 
 function getRequiredEnv() {
   const openaiApiKey = process.env.OPENAI_API_KEY;
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseServiceKey =
-    process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!openaiApiKey || !supabaseUrl || !supabaseServiceKey) {
-    throw new Error(
-      "Missing required env vars: OPENAI_API_KEY, SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL), SUPABASE_SERVICE_KEY (or SUPABASE_SERVICE_ROLE_KEY)"
-    );
+  if (!openaiApiKey) {
+    throw new Error("Missing required env var: OPENAI_API_KEY");
   }
 
-  return { openaiApiKey, supabaseUrl, supabaseServiceKey };
+  return { openaiApiKey };
 }
 
 async function runKeywordSearch(supabase, query) {
@@ -104,14 +99,12 @@ export async function POST(request) {
       return NextResponse.json({ error: "query is required" }, { status: 400 });
     }
 
-    const { openaiApiKey, supabaseUrl, supabaseServiceKey } = getRequiredEnv();
+    const { openaiApiKey } = getRequiredEnv();
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    });
+    const supabase = getServiceSupabase();
+    if (!supabase) {
+      return NextResponse.json({ error: "Server misconfigured: missing Supabase credentials" }, { status: 500 });
+    }
 
     const useKeyword =
       mode === "keyword" || (mode === "auto" && shouldUseDirectKeywordSearch(query));

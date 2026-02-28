@@ -1,47 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { mapXBookmarksToTweets } from "@/lib/twitter";
-import type { LinkCardData } from "@/lib/supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getServiceSupabase } from "@/lib/supabaseServer";
+import { deriveLinkCardsFromRawJson } from "@/lib/twitter";
 
 export const runtime = "nodejs";
 
 const PAGE_SIZE = 20;
-
-function deriveLinkCardsFromRawJson(rawJson: unknown): LinkCardData[] {
-  if (!rawJson || typeof rawJson !== "object") return [];
-
-  try {
-    const mapped = mapXBookmarksToTweets(
-      [rawJson] as Parameters<typeof mapXBookmarksToTweets>[0],
-      {}
-    );
-    return Array.isArray(mapped[0]?.link_cards) ? mapped[0].link_cards : [];
-  } catch {
-    return [];
-  }
-}
-
-let _serviceSupabase: SupabaseClient | null = null;
-
-function getServiceSupabase(): SupabaseClient | null {
-  if (_serviceSupabase) return _serviceSupabase;
-
-  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !serviceKey) {
-    return null;
-  }
-
-  _serviceSupabase = createClient(url, serviceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-
-  return _serviceSupabase;
-}
 
 function parseCursor(cursor: string | null): number {
   if (!cursor) return 0;

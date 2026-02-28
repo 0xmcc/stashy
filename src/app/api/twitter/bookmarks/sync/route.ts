@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { getServiceSupabase } from "@/lib/supabaseServer";
 import { mapXBookmarksToTweets } from "@/lib/twitter";
 import { persistBookmarksForOwnerWithClient } from "@/lib/bookmarkPersistence";
 import type { Tweet } from "@/lib/supabase";
@@ -16,25 +16,6 @@ interface BookmarkResponse {
   meta?: {
     next_token?: string;
   };
-}
-
-let _serviceSupabase: SupabaseClient | null = null;
-
-function getServiceSupabase(): SupabaseClient | null {
-  if (_serviceSupabase) return _serviceSupabase;
-
-  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceKey) return null;
-
-  _serviceSupabase = createClient(url, serviceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-
-  return _serviceSupabase;
 }
 
 async function fetchBookmarksFromX(accessToken: string, userId: string): Promise<BookmarkResponse> {

@@ -1,5 +1,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { mapXBookmarksToTweets } from "./twitter";
+import { toArray } from "./arrayGuards";
+import { PAGE_SIZE } from "./constants";
 
 let _supabase: SupabaseClient | null = null;
 
@@ -89,7 +91,14 @@ export interface LinkCardData {
   site_name: string;
 }
 
-const PAGE_SIZE = 20;
+function normalizeTweetArrays(row: Record<string, unknown>): Tweet {
+  return {
+    ...row,
+    media: toArray(row.media as MediaItem[] | null),
+    link_cards: toArray(row.link_cards as LinkCardData[] | null),
+    tags: toArray(row.tags as string[] | null),
+  } as Tweet;
+}
 
 function deriveLinkCardsFromRawJson(rawJson: unknown): LinkCardData[] {
   if (!rawJson || typeof rawJson !== "object") return [];
@@ -132,16 +141,14 @@ export async function fetchTweets(
     return { tweets: [], hasMore: false };
   }
 
-  const tweets = (data ?? []).map((row) => ({
-    ...row,
-    media: Array.isArray(row.media) ? row.media : [],
-    link_cards: (() => {
-      const persisted = Array.isArray(row.link_cards) ? row.link_cards : [];
-      if (persisted.length > 0) return persisted;
-      return deriveLinkCardsFromRawJson(row.raw_json);
-    })(),
-    tags: Array.isArray(row.tags) ? row.tags : [],
-  })) as Tweet[];
+  const tweets = (data ?? []).map((row) => {
+    const normalized = normalizeTweetArrays(row);
+    const persistedCards = normalized.link_cards;
+    return {
+      ...normalized,
+      link_cards: persistedCards.length > 0 ? persistedCards : deriveLinkCardsFromRawJson(row.raw_json),
+    };
+  });
 
   return { tweets, hasMore: tweets.length === PAGE_SIZE };
 }
@@ -157,12 +164,7 @@ export async function fetchTweetById(
 
   if (error || !data) return null;
 
-  return {
-    ...data,
-    media: Array.isArray(data.media) ? data.media : [],
-    link_cards: Array.isArray(data.link_cards) ? data.link_cards : [],
-    tags: Array.isArray(data.tags) ? data.tags : [],
-  } as Tweet;
+  return normalizeTweetArrays(data);
 }
 
 export async function fetchAllTags(): Promise<string[]> {
@@ -174,7 +176,7 @@ export async function fetchAllTags(): Promise<string[]> {
 
   const tagSet = new Set<string>();
   data.forEach((row) => {
-    const tags = Array.isArray(row.tags) ? row.tags : [];
+    const tags = toArray(row.tags as string[] | null);
     tags.forEach((tag: string) => tagSet.add(tag));
   });
 

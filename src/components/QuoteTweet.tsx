@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { Tweet, QuotedTweetData, MediaItem } from "../lib/supabase";
 import { fetchTweetById } from "../lib/supabase";
+import { toArray } from "../lib/arrayGuards";
 import Avatar from "./Avatar";
 import MediaGrid from "./MediaGrid";
 import LinkCard from "./LinkCard";
@@ -66,7 +67,7 @@ export default function QuoteTweet({ quotedTweetId, quotedTweet, onArticleClick 
   }
 
   const segments = tweet.tweet_text ? parseTextWithUrls(tweet.tweet_text) : [];
-  const media: MediaItem[] = Array.isArray(tweet.media) ? tweet.media : [];
+  const media: MediaItem[] = toArray<MediaItem>(tweet.media);
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();

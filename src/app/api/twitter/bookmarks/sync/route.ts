@@ -41,7 +41,7 @@ async function fetchBookmarksFromX(accessToken: string, userId: string): Promise
   const url = new URL(`https://api.x.com/2/users/${userId}/bookmarks`);
   url.searchParams.set(
     "tweet.fields",
-    "created_at,public_metrics,entities,in_reply_to_user_id,conversation_id,referenced_tweets,attachments"
+    "created_at,public_metrics,entities,in_reply_to_user_id,conversation_id,referenced_tweets,attachments,article"
   );
   url.searchParams.set(
     "expansions",

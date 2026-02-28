@@ -32,12 +32,22 @@ interface XMedia {
 interface XUrlEntity {
   url?: string;
   expanded_url?: string;
+  unwound_url?: string;
   display_url?: string;
+  title?: string;
+  description?: string;
+  images?: Array<{ url?: string }>;
 }
 
 interface XReferencedTweet {
   id: string;
   type: "quoted" | "retweeted" | "replied_to" | string;
+}
+
+interface XArticle {
+  title?: string;
+  description?: string;
+  image_url?: string;
 }
 
 interface XTweet {
@@ -49,6 +59,7 @@ interface XTweet {
   entities?: {
     urls?: XUrlEntity[];
   };
+  article?: XArticle;
   attachments?: {
     media_keys?: string[];
   };
@@ -85,6 +96,16 @@ function isTwitterUrl(url: string): boolean {
   return domain === "x.com" || domain.endsWith(".x.com") || domain === "twitter.com" || domain.endsWith(".twitter.com") || domain === "t.co";
 }
 
+function isXArticleUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, "");
+    return (host === "x.com" || host === "twitter.com") && parsed.pathname.startsWith("/i/article/");
+  } catch {
+    return false;
+  }
+}
+
 function mapMedia(mediaKeys: string[] | undefined, mediaByKey: Map<string, XMedia>): MediaItem[] {
   if (!mediaKeys?.length) return [];
 
@@ -101,20 +122,28 @@ function mapMedia(mediaKeys: string[] | undefined, mediaByKey: Map<string, XMedi
     .filter((item) => Boolean(item.url));
 }
 
-function mapLinkCards(entities: XTweet["entities"]): LinkCardData[] {
-  const urls = entities?.urls ?? [];
+function mapLinkCards(tweet: XTweet): LinkCardData[] {
+  const urls = tweet.entities?.urls ?? [];
 
   return urls
     .map((entry) => {
-      const targetUrl = entry.expanded_url || entry.url;
-      if (!targetUrl || isTwitterUrl(targetUrl)) return null;
+      const targetUrl = entry.unwound_url || entry.expanded_url || entry.url;
+      if (!targetUrl) return null;
+
+      // Keep unresolved t.co links so downstream enrichment can resolve metadata.
+      const isUnresolvedTco = toDomain(targetUrl) === "t.co";
+      const isArticleUrl = isXArticleUrl(targetUrl);
+      if (!isUnresolvedTco && isTwitterUrl(targetUrl) && !isArticleUrl) return null;
 
       const domain = toDomain(targetUrl);
+      const title = entry.title?.trim() || tweet.article?.title?.trim() || entry.display_url || targetUrl;
+      const description = entry.description?.trim() || tweet.article?.description?.trim() || "";
+      const image = entry.images?.[0]?.url || tweet.article?.image_url || "";
       return {
         url: targetUrl,
-        title: entry.display_url || targetUrl,
-        description: "",
-        image: "",
+        title,
+        description,
+        image,
         site_name: domain,
       } as LinkCardData;
     })
@@ -155,6 +184,7 @@ function mapQuotedTweet(
     timestamp: quoted.created_at || null,
     source_url: handle ? `https://x.com/${handle}/status/${quoted.id}` : `https://x.com/i/status/${quoted.id}`,
     media: mapMedia(quoted.attachments?.media_keys, mediaByKey),
+    link_cards: mapLinkCards(quoted),
   };
 }
 
@@ -178,7 +208,7 @@ export function mapXBookmarksToTweets(data: XTweet[] = [], includes: XIncludes =
       timestamp: tweet.created_at || null,
       source_url: handle ? `https://x.com/${handle}/status/${tweet.id}` : `https://x.com/i/status/${tweet.id}`,
       media: mapMedia(tweet.attachments?.media_keys, mediaByKey),
-      link_cards: mapLinkCards(tweet.entities),
+      link_cards: mapLinkCards(tweet),
       quoted_tweet_id: quotedRef?.id || null,
       quoted_tweet: mapQuotedTweet(quotedRef, quotedTweetsById, usersById, mediaByKey),
       in_reply_to_tweet_id: tweet.in_reply_to_user_id || null,

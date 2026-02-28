@@ -140,6 +140,126 @@ describe("/api/twitter/bookmarks", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("derives article link card from raw_json when persisted link_cards are empty", async () => {
+    process.env.SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SERVICE_KEY = "service-role-key";
+
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const fromMock = vi.fn((table: string) => {
+      if (table === "collections") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: { id: "bookmarks-col" },
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        };
+      }
+
+      if (table === "collection_tweets") {
+        return {
+          select: () => ({
+            eq: () => ({
+              order: () => ({
+                range: async () => ({
+                  data: [{ tweet_id: "tweet-article-1" }],
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        };
+      }
+
+      if (table === "tweets") {
+        return {
+          select: () => ({
+            in: async () => ({
+              data: [
+                {
+                  id: 10,
+                  tweet_id: "tweet-article-1",
+                  tweet_text: "https://t.co/7B7PDa1RqB",
+                  author_handle: "nateliason",
+                  author_display_name: "Nat Eliason",
+                  author_avatar_url: null,
+                  timestamp: "2026-02-02T15:53:37.000Z",
+                  source_url: "https://x.com/nateliason/status/tweet-article-1",
+                  media: [],
+                  link_cards: [],
+                  quoted_tweet_id: null,
+                  quoted_tweet: null,
+                  in_reply_to_tweet_id: null,
+                  conversation_id: "tweet-article-1",
+                  raw_json: {
+                    id: "2018352113860927648",
+                    text: "https://t.co/7B7PDa1RqB",
+                    article: {
+                      title: "Bring Your Own Agent: The Future of AI-Powered Apps",
+                    },
+                    entities: {
+                      urls: [
+                        {
+                          url: "https://t.co/7B7PDa1RqB",
+                          expanded_url: "http://x.com/i/article/2018347415263117312",
+                          unwound_url: "https://x.com/i/article/2018347415263117312",
+                          display_url: "x.com/i/article/2018...",
+                        },
+                      ],
+                    },
+                  },
+                  tags: [],
+                  notes: null,
+                  saved_at: null,
+                  created_at: null,
+                },
+              ],
+              error: null,
+            }),
+          }),
+        };
+      }
+
+      return {
+        select: () => ({
+          maybeSingle: async () => ({ data: null, error: null }),
+        }),
+      };
+    });
+
+    createClientMock.mockReturnValue({
+      from: fromMock,
+    });
+
+    const { GET } = await import("./route");
+    const response = await GET(
+      makeRequest({
+        x_access_token: "access-token",
+        x_user_id: "123",
+      })
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.tweets).toHaveLength(1);
+    expect(payload.tweets[0].link_cards).toHaveLength(1);
+    expect(payload.tweets[0].link_cards[0]).toEqual({
+      url: "https://x.com/i/article/2018347415263117312",
+      title: "Bring Your Own Agent: The Future of AI-Powered Apps",
+      description: "",
+      image: "",
+      site_name: "x.com",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("falls back to legacy owner_x_user_id column when owner_user_id is unavailable", async () => {
     process.env.SUPABASE_URL = "https://example.supabase.co";
     process.env.SUPABASE_SERVICE_KEY = "service-role-key";

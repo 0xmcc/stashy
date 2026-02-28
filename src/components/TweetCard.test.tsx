@@ -83,4 +83,32 @@ describe("TweetCard semantic selection UX", () => {
     expect(sourceLink).not.toBeNull();
     expect(sourceLink?.getAttribute("href")).toBe("https://x.com/marko/status/1");
   });
+
+  it("opens JSON inspector on icon click and keeps it visible", async () => {
+    const tweet = baseTweet();
+    tweet.raw_json = {
+      id: "tweet-1",
+      entities: {
+        urls: [{ url: "https://t.co/abc123" }],
+      },
+    };
+
+    await act(async () => {
+      root.render(<TweetCard tweet={tweet} />);
+    });
+
+    const jsonButton = container.querySelector('button[aria-label="Show tweet JSON"]') as HTMLButtonElement | null;
+    expect(jsonButton).not.toBeNull();
+    expect(container.querySelector('[data-testid="tweet-json-popover"]')).toBeNull();
+
+    await act(async () => {
+      jsonButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    const popover = document.body.querySelector('[data-testid="tweet-json-popover"]') as HTMLElement | null;
+    expect(popover).not.toBeNull();
+    expect(popover?.className).toContain("fixed");
+    expect(popover?.textContent).toContain('"id": "tweet-1"');
+    expect(popover?.textContent).toContain('"https://t.co/abc123"');
+  });
 });

@@ -70,4 +70,53 @@ describe("SemanticSearch chat flow", () => {
     expect(container.textContent).toContain("What does source [1] claim?");
     expect(container.textContent).toContain("Here is a sourced answer [1].");
   });
+
+  it("shows an error when sending input with no retrieved items", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      json: async () => ({ error: "retrievedItems is required and cannot be empty" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await act(async () => {
+      root.render(
+        <SemanticSearch
+          results={[]}
+          selectedIds={[]}
+          onResultsChange={vi.fn()}
+          onSelectedIdsChange={vi.fn()}
+          onClose={vi.fn()}
+        />
+      );
+    });
+
+    const chatInput = container.querySelector('input[placeholder="ask a question or request a draft..."]');
+    expect(chatInput).not.toBeNull();
+
+    await act(async () => {
+      const valueSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        "value"
+      )?.set;
+      valueSetter?.call(chatInput, "Hello");
+      chatInput.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const sendButton =
+      container.querySelector('button[type="submit"][aria-label="Send message"]') ||
+      Array.from(container.querySelectorAll("button")).find((btn) => btn.textContent?.match(/refine|send/i));
+
+    expect(sendButton).not.toBeNull();
+
+    await act(async () => {
+      sendButton.click();
+      await flushPromises();
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    expect(container.textContent).toContain("retrievedItems is required and cannot be empty");
+
+    expect(container.textContent).toContain("retrievedItems is required and cannot be empty");
+  });
 });

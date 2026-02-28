@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { mapXBookmarksToTweets } from "./twitter";
 
 let _supabase: SupabaseClient | null = null;
 
@@ -24,6 +25,7 @@ export interface QuotedTweetData {
   timestamp: string | null;
   source_url: string;
   media: MediaItem[];
+  link_cards: LinkCardData[];
 }
 
 export interface Tweet {
@@ -89,6 +91,20 @@ export interface LinkCardData {
 
 const PAGE_SIZE = 20;
 
+function deriveLinkCardsFromRawJson(rawJson: unknown): LinkCardData[] {
+  if (!rawJson || typeof rawJson !== "object") return [];
+
+  try {
+    const mapped = mapXBookmarksToTweets(
+      [rawJson] as Parameters<typeof mapXBookmarksToTweets>[0],
+      {}
+    );
+    return Array.isArray(mapped[0]?.link_cards) ? mapped[0].link_cards : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchTweets(
   page: number,
   search?: string,
@@ -119,7 +135,11 @@ export async function fetchTweets(
   const tweets = (data ?? []).map((row) => ({
     ...row,
     media: Array.isArray(row.media) ? row.media : [],
-    link_cards: Array.isArray(row.link_cards) ? row.link_cards : [],
+    link_cards: (() => {
+      const persisted = Array.isArray(row.link_cards) ? row.link_cards : [];
+      if (persisted.length > 0) return persisted;
+      return deriveLinkCardsFromRawJson(row.raw_json);
+    })(),
     tags: Array.isArray(row.tags) ? row.tags : [],
   })) as Tweet[];
 

@@ -20,6 +20,7 @@ This file defines all project rules, coding standards, workflow guidelines, refe
 *   `src/app/api/`: API routes (Next.js).
 *   `.specstory/`: SpecStory files.
 *   `.cursor/skills/`: Project-level skills for the AI coding assistant.
+*   `e2e/`: End-to-end tests.
 
 ## TECH STACK
 *   Frontend: React, TypeScript, Next.js
@@ -28,6 +29,7 @@ This file defines all project rules, coding standards, workflow guidelines, refe
 *   UI Library: [Specify UI Library if applicable]
 *   Article Extraction: @mozilla/readability
 *   HTML Parsing: jsdom
+*   End-to-end Testing: Playwright
 
 ## PROJECT-SPECIFIC STANDARDS
 *   **Data Fetching:** Use server-side data fetching where possible for improved performance and SEO.
@@ -52,7 +54,7 @@ public_metrics?: {
     *   Handle token refresh logic.
     *   Transform X API v2 responses to the internal `Tweet` format using `mapXBookmarksToTweets()`.
     *   When fetching X bookmarks, use the following parameters:
-        *   `tweet.fields=created_at,public_metrics,entities,in_reply_to_user_id,conversation_id,referenced_tweets,attachments`
+        *   `tweet.fields=created_at,public_metrics,entities,in_reply_to_user_id,conversation_id,referenced_tweets,attachments,article`
         *   `expansions=author_id,attachments.media_keys,referenced_tweets.id,referenced_tweets.id.author_id`
         *   `user.fields=name,username,profile_image_url`
         *   `media.fields=url,preview_image_url,type,width,height`
@@ -63,6 +65,10 @@ public_metrics?: {
     *   Implement graceful fallback if extraction fails.
 *   **Link Handling:**
     *   Use the `onArticleClick` prop in `TweetCard` and `LinkCard` to handle link clicks and open articles in the in-app reader.
+    *   Enrich `t.co` links by showing real metadata (title/description/image). Prioritize using the X API if possible, but use Playwright as a fallback if necessary.
+        *   The `mapLinkCards()` function in `src/lib/twitter.ts` should map `t.co` entities to `unwound_url` when present and populate `title`, `description`, and `image` from X URL entity metadata. Also detect and handle `x.com/i/article/*` and `twitter.com/i/article/*` links, using `tweet.article.title` and `tweet.article.description` as fallbacks when URL entity titles and descriptions are missing.
+        *   Keep unresolved `t.co` links as cards so they can be enriched later.
+*   **Article Metadata Display:** When tweets include article metadata, display that metadata. Ideally, include the cover image; otherwise, display the title.
 *   **Environment Variables:**
     *   `TWITTER_CLIENT_ID`: Consumer Key (aka API Key)
     *   `TWITTER_CLIENT_SECRET`: Secret Key (aka API Key Secret / Consumer Secret)
@@ -109,7 +115,7 @@ public_metrics?: {
         *   The route still references optional columns not in live schema (`quoted_tweet`, `public_metrics`). This must be hard-gated in implementation (omit now or add migration first).
         *   The read-path is still not wired. You defined the visibility query, but until app reads switch to it, behavior won’t reflect collection visibility rules.
         *   The security posture of the `tweets` table is still broad/no-RLS in your environment. That’s acceptable for this phase only if you explicitly accept temporary exposure risk.
-*   **Test-Driven Development (TDD):** Before implementing bug fixes or new features, write failing tests first. This enforces a "red-green-refactor" cycle. The AI coding assistant should load the `.cursor/skills/test-first-development/SKILL.md` skill before coding bug fixes/features. This enforces the sequence: tests first, confirm failing, minimal implementation, confirm passing. Skipping should only be allowed when explicitly requested.
+*   **Test-Driven Development (TDD):** Before implementing bug fixes or new features, always write failing tests first. This enforces a "red-green-refactor" cycle. The AI coding assistant should load the `.cursor/skills/test-first-development/SKILL.md` skill before coding bug fixes/features. This enforces the sequence: tests first, confirm failing, minimal implementation, confirm passing. Skipping should only be allowed when explicitly requested.
 *   **Search Strategies:** Implement both fast keyword searches and slower embedded searches. Integrate the slower embedded results into the initial keyword search results in a way that does not introduce UI jank.
 *   **Tab Persistence:** The application should remember the selected tab (Facebook, Twitter, or Digest) in local storage so it is restored on reload.
 *   **Conversational Chat:** Implement a conversational chat feature that allows users to ask questions based on selected tweets and receive responses based on the content of those tweets. This is in addition to the existing tweet generation functionality.
@@ -123,7 +129,7 @@ public_metrics?: {
     *   When semantic search is active, the tweet row click behavior now toggles selection state (selected/unselected) instead of navigating away.
         *   Logic is in `src/components/TweetCard.tsx` (`handleCardClick` calls `onToggleSelect`).
         *   It’s active when semantic selection mode is on (via `selectable` from `TweetFeed`).
-    *   **Semantic Search Visibility:** Semantic search should always be visible. Remove the toggle button for it.
+*   **Semantic Search Visibility:** Semantic search should always be visible. Remove the toggle button for it.
 *   **X API Usage:**
     *   Ensure the app doesn't call the X API every single time to get bookmarks. Space out the calls to avoid duplicative fetching of the same tweets, to conserve quota.
     *   Serve cached bookmarks from DB by default.
@@ -152,10 +158,46 @@ public_metrics?: {
 *   **Bookmarks Tab Data Source:** The `X Bookmarks` tab reads **only cached/persisted bookmarks** from `collections` + `collection_tweets` + `tweets` via `GET /api/twitter/bookmarks` in `src/app/api/twitter/bookmarks/route.ts`. Live X fetch only happens when you click **Sync Bookmarks** (`POST /api/twitter/bookmarks/sync`). The bookmarks tab returns empty when collection lookup/membership lookup fails (it doesn’t surface a loud error in UI). The empty-state copy should say “No cached bookmarks found” instead of “No bookmarks returned from X”. `My Stash` reads directly from `tweets` via `fetchTweets(...)` in `src/lib/supabase.ts`.
 *   **Collections Table Requirement:** The `collections` and `collection_tweets` tables are required for the `X Bookmarks` tab to function correctly. If these tables do not exist, the tab will be empty. To create these tables, run the SQL from `supabase/sql/collections.sql` in your Supabase SQL editor (or apply via your migration flow). Ensure `gen_random_uuid()` works (usually `pgcrypto` is enabled; if not, enable it).
 *   **fetchTweetById Error Handling:** When fetching tweets by ID, especially for quoted tweets, use `.maybeSingle()` instead of `.single()` in `fetchTweetById` in `src/lib/supabase.ts` to handle the case where a quoted tweet row is missing. This prevents Supabase/PostgREST from returning `406 Not Acceptable` errors and converts the error into a clean `null` return.
+*   **Link Metadata Enrichment:**
+    *   Enrich `t.co` links by showing real metadata (title/description/image).
+    *   Prioritize using the X API if possible.
+    *   Use Playwright as a fallback if necessary.
+    *   The `mapLinkCards()` function in `src/lib/twitter.ts` should map `t.co` entities to `unwound_url` when present and populate `title`, `description`, and `image` from X URL entity metadata. Also detect and handle `x.com/i/article/*` and `twitter.com/i/article/*` links, using `tweet.article.title` and `tweet.article.description` as fallbacks when URL entity titles and descriptions are missing.
+    *   Keep unresolved `t.co` links as cards so they can be enriched later.
+*   **Article Metadata Display:** When tweets include article metadata, display that metadata. Ideally, include the cover image; otherwise, display the title.
+*   **JSON Inspector:** Each tweet should have a click-to-toggle JSON inspector icon in the header row. Clicking the icon should show the raw tweet payload (`tweet.raw_json`) in a scrollable, viewport-level popover. The inspector should remain open until closed. The inspector should:
+    *   Anchor to the icon,
+    *   Clamp horizontally to viewport bounds,
+    *   Flip above the icon when there isn’t enough space below,
+    *   Keep a bounded max height so it remains scrollable instead of getting cut off.
+*   **End-to-End (E2E) Testing:**
+    *   Use Playwright for E2E testing.
+    *   Create test files in the `e2e/` directory.
+    *   Follow the pattern in existing E2E tests (e.g., `e2e/sidebar-navigation.spec.ts`).
+    *   Use `npm run test:e2e` to run E2E tests.
+    *   Run browser automation by default without asking for permission first.
+    *   Interrupt only when the platform itself requires an explicit approval prompt (for elevated permissions). Keep it to one concise request and continue immediately after approval.
+    *   Use non-browser checks first (`lint`, `typecheck`, targeted tests, builds).
+    *   Only request browser automation when it’s truly necessary for UI behavior.
+    *   Batch browser actions into one run instead of repeated permission asks.
+    *   Ask for approval once with a clear scope (what I’ll test and why), then execute end-to-end.
+*   **Test-Driven Development (TDD):** The AI coding assistant must remember to write a failing test before starting any coding for feature or bug changes. The AI should adhere to the red-green-refactor cycle.
+*   **Code Refactoring:**
+    *   Before any significant code refactoring, run `npx vitest run` as a baseline.
+    *   Run `npx vitest run` after each refactoring step to ensure no regressions are introduced.
+    *   Run `npx tsc --noEmit` after every file change in Priority 2+ refactors.
+    *   For non-trivial extractions during refactoring, add or lock characterization tests *before* the extraction to ensure the existing behavior is preserved.
+    *   When refactoring, break down large changes into smaller, PR-sized slices.
+    *   Define explicit acceptance criteria per refactoring step (e.g., per "letter" in a refactoring plan) to ensure that behavior remains unchanged.
+*   **Utility Functions:** Avoid creating a "junk drawer" `src/lib/utils.ts` file. Instead, prefer domain-focused modules (e.g., `tweetFormatting.ts`, `arrayGuards.ts`, `supabaseServer.ts`).
+*   **`useTweetFeed` Coordinator:** When using a coordinator pattern like `useTweetFeed`, prefer discriminated union return types over no-op placeholders to avoid hiding invalid states and masking bugs. Use discriminated union return types:
+    *   `{ dataSource: "stash", ...stashFields }`
+    *   `{ dataSource: "bookmarks", ...bookmarkFields }`
+    *   Consumers branch on `dataSource` before calling source-specific actions.
 
 ## WORKFLOW & RELEASE RULES
-*   **Branching:** Use feature branches for new features or bug fixes.
-*   **Pull Requests:** Create pull requests for all code changes.
+*   **Branching:** Use feature branches for new features or bug fixes. Run all refactor work on a dedicated branch; no direct work on `master`.
+*   **Pull Requests:** Create pull requests for all code changes. Split large changes into small PR-sized slices.
 *   **Code Review:** All code must be reviewed before being merged.
 *   **Testing:** Write unit tests and integration tests to ensure code quality.
 *   **Deployment:** Use Vercel for deployment.
@@ -205,7 +247,17 @@ public_metrics?: {
     *   Before merging, ensure all changes are committed.
     *   The default branch is `master`.
     *   The AI can commit changes, merge branches, and push to GitHub after user confirmation. The user must provide the commit message and the remote to push to (`origin` or `upstream`).
-*   **Medium-to-Large Tasks:** When given medium-to-large sized tasks, the AI should provide a todo list at the end of the response listing the remaining tasks that were not yet completed.
+    *   Exclude generated output artifacts (`test-results` and the SpecStory export file) from commits.
+*   **Agent Strategy:** Use subagents in parallel for codebase discovery/test inventory only; keep implementation changes in the main agent to preserve coherence and avoid conflicting edits.
+*   **TDD Gate:** No non-trivial extraction or file split starts until characterization tests are added and failing/passing behavior is captured.
+*   **Refactoring Slices:** Break down large refactoring tasks into smaller, PR-sized slices for easier review and rollback. Suggested PR slices for large refactors:
+    *   `A + A2` (Supabase server client extraction + link-card derivation extraction)
+    *   `B + C` (constant centralization + array guard normalization)
+    *   `D` (metric formatter extraction + focused unit tests)
+    *   `E` (`page.tsx` hook extraction)
+    *   `F` (`useTweetFeed` decomposition with typed branch-safe API)
+    *   `G` (`SemanticSearch.jsx` → TS + panel hook)
+    *   `I + H` (auth route tests prerequisite + collections fallback consolidation)
 
 ## REFERENCE EXAMPLES
 *   **X API v2 field mappings to Tweet field:**
@@ -251,7 +303,8 @@ select count(*) from public.collection_tweets;
 ```
 
 After syncing bookmarks once, you should see rows in both.
-*   **406 (Not Acceptable) Errors:** When encountering 406 errors related to Supabase queries, especially when fetching tweets by ID, ensure that the code handles the case where a quoted tweet row is missing. Use `.maybeSingle()` instead of `.single()` in `fetchTweetById` to handle missing data gracefully. Write tests to reproduce the bug before attempting to fix it.
+*   **406 (Not Acceptable) Errors:** When encountering 406 errors related to Supabase queries, especially when fetching tweets by ID, ensure that the code handles the case where a quoted tweet row is missing. Use `.maybeSingle()` instead of `.single()` in `fetchTweetById` to handle the case where a quoted tweet row is missing. Write tests to reproduce the bug before attempting to fix it.
+*   **Playwright Troubleshooting:** If Playwright fails to launch the browser due to an executable not found error, ensure that the correct browser is installed and that the `PLAYWRIGHT_BROWSERS_PATH` environment variable is correctly set. Use the `--force` flag when installing browsers to ensure the correct architecture is downloaded (e.g., `npx playwright install chromium --force`).
 
 ## FINAL DOs AND DON'Ts
 *   **DO** follow the coding standards and guidelines outlined in this file.
@@ -260,3 +313,18 @@ After syncing bookmarks once, you should see rows in both.
 *   **DON'T** commit code without review.
 *   **DON'T** leave commented-out code in the codebase.
 *   **ALWAYS** run tests to reproduce the reported problem before trying to fix it. Test must fail first.
+*   For every refactoring step:
+    *   Add characterization tests for current behavior first.
+    *   Run tests to confirm baseline green.
+    *   Implement refactor in smallest diff possible.
+    *   Re-run targeted tests + full `vitest` + `tsc --noEmit` (for TS-affecting steps).
+    *   Do a brief manual smoke only where UI workflow changed.
+*   For `page.tsx` behavior and feed switching refactors, require characterization coverage for:
+    *   page load defaults
+    *   onboarding modal behavior
+    *   URL param side effects
+    *   feed/source switching and state reset semantics
+    *   semantic selection and search/chat interactions
+*   **Refactoring Tools:**
+    *   Use `/batch` for mechanical, mostly independent migrations with clear test or type-check gates. Not ideal for tightly coupled behavioral refactors.
+    *   Use `/simplify` after each PR slice to clean duplication, tighten typings, and enforce project conventions.

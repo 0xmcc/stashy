@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { Tweet } from "../lib/supabase";
 import Avatar from "./Avatar";
 import MediaGrid from "./MediaGrid";
@@ -24,6 +25,10 @@ function formatMetric(value: number | undefined): string {
   return String(value);
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
 export default function TweetCard({
   tweet,
   onArticleClick,
@@ -33,6 +38,10 @@ export default function TweetCard({
   similarityLabel,
 }: TweetCardProps) {
   const segments = tweet.tweet_text ? parseTextWithUrls(tweet.tweet_text) : [];
+  const rawJsonPreview = JSON.stringify(tweet.raw_json ?? {}, null, 2);
+  const [isJsonOpen, setIsJsonOpen] = useState(false);
+  const [jsonPopoverStyle, setJsonPopoverStyle] = useState<React.CSSProperties>({});
+  const jsonButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const handleCardClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
@@ -43,11 +52,57 @@ export default function TweetCard({
     }
   };
 
+  useEffect(() => {
+    if (!isJsonOpen) return;
+
+    const updateJsonPopoverPosition = () => {
+      const anchor = jsonButtonRef.current;
+      if (!anchor) return;
+
+      const rect = anchor.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const horizontalPadding = 8;
+      const verticalGap = 8;
+      const requestedWidth = 560;
+      const maxAllowedWidth = Math.max(280, viewportWidth - horizontalPadding * 2);
+      const width = Math.min(requestedWidth, maxAllowedWidth);
+      const requestedHeight = 420;
+
+      let left = rect.right - width;
+      left = clamp(left, horizontalPadding, viewportWidth - width - horizontalPadding);
+
+      let top = rect.bottom + verticalGap;
+      const wouldOverflowBottom = top + requestedHeight > viewportHeight - horizontalPadding;
+      if (wouldOverflowBottom) {
+        top = Math.max(horizontalPadding, rect.top - requestedHeight - verticalGap);
+      }
+
+      const maxHeight = Math.max(220, viewportHeight - top - horizontalPadding);
+
+      setJsonPopoverStyle({
+        position: "fixed",
+        top,
+        left,
+        width,
+        maxHeight,
+      });
+    };
+
+    updateJsonPopoverPosition();
+    window.addEventListener("resize", updateJsonPopoverPosition);
+    window.addEventListener("scroll", updateJsonPopoverPosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updateJsonPopoverPosition);
+      window.removeEventListener("scroll", updateJsonPopoverPosition, true);
+    };
+  }, [isJsonOpen]);
+
   return (
     <article
-      className={`cursor-pointer border-b border-[rgb(47,51,54)] px-4 py-3 transition-colors hover:bg-[rgb(8,10,13)] ${
-        selectable ? (selected ? "opacity-100" : "opacity-50") : ""
-      }`}
+      className={`cursor-pointer border-b border-[rgb(47,51,54)] px-4 py-3 transition-colors hover:bg-[rgb(8,10,13)] ${selectable ? (selected ? "opacity-100" : "opacity-50") : ""
+        }`}
       onClick={handleCardClick}
     >
       {tweet.in_reply_to_tweet_id && (
@@ -118,6 +173,39 @@ export default function TweetCard({
                 </svg>
               </a>
             ) : null}
+            <div className="relative ml-1">
+              <button
+                ref={jsonButtonRef}
+                type="button"
+                aria-label="Show tweet JSON"
+                aria-expanded={isJsonOpen}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setIsJsonOpen((prev) => !prev);
+                }}
+                className="inline-flex items-center text-[rgb(113,118,123)] transition-colors hover:text-[rgb(29,155,240)]"
+              >
+                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5 3 12l6 7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m15 5 6 7-6 7" />
+                </svg>
+              </button>
+              {isJsonOpen
+                ? createPortal(
+                  <div
+                    data-testid="tweet-json-popover"
+                    className="fixed z-[70] rounded-md border border-[rgb(47,51,54)] bg-[rgb(8,10,13)] p-3 shadow-lg"
+                    style={jsonPopoverStyle}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <pre className="h-full overflow-auto whitespace-pre-wrap break-words text-[13px] leading-5 text-[rgb(113,118,123)]">
+                      {rawJsonPreview}
+                    </pre>
+                  </div>,
+                  document.body
+                )
+                : null}
+            </div>
           </div>
 
           {tweet.tweet_text && (
@@ -151,8 +239,8 @@ export default function TweetCard({
                   onClick={
                     onArticleClick
                       ? (url) => {
-                          onArticleClick(url, tweet);
-                        }
+                        onArticleClick(url, tweet);
+                      }
                       : undefined
                   }
                 />
@@ -164,6 +252,7 @@ export default function TweetCard({
             <QuoteTweet
               quotedTweet={tweet.quoted_tweet}
               quotedTweetId={tweet.quoted_tweet_id || undefined}
+              onArticleClick={onArticleClick ? (url: string) => onArticleClick(url, tweet) : undefined}
             />
           )}
 

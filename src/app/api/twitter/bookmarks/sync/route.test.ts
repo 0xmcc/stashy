@@ -108,6 +108,9 @@ describe("/api/twitter/bookmarks/sync", () => {
 
     expect(response.status).toBe(200);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    const calledUrl = String(fetchMock.mock.calls[0]?.[0] ?? "");
+    expect(calledUrl).toContain("tweet.fields=");
+    expect(calledUrl).toContain("article");
     expect(mapXBookmarksToTweetsMock).toHaveBeenCalledTimes(1);
     expect(persistBookmarksForOwnerWithClientMock).toHaveBeenCalledTimes(1);
     expect(payload.status).toBe("ok");

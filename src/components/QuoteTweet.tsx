@@ -5,14 +5,16 @@ import type { Tweet, QuotedTweetData, MediaItem } from "../lib/supabase";
 import { fetchTweetById } from "../lib/supabase";
 import Avatar from "./Avatar";
 import MediaGrid from "./MediaGrid";
+import LinkCard from "./LinkCard";
 import { formatRelativeTime, parseTextWithUrls } from "../lib/utils";
 
 interface QuoteTweetProps {
   quotedTweetId?: string;
   quotedTweet?: QuotedTweetData | null;
+  onArticleClick?: (url: string) => void;
 }
 
-export default function QuoteTweet({ quotedTweetId, quotedTweet }: QuoteTweetProps) {
+export default function QuoteTweet({ quotedTweetId, quotedTweet, onArticleClick }: QuoteTweetProps) {
   const [fetchedTweet, setFetchedTweet] = useState<Tweet | null>(null);
   const [loading, setLoading] = useState(!quotedTweet && !!quotedTweetId);
 
@@ -46,9 +48,19 @@ export default function QuoteTweet({ quotedTweetId, quotedTweet }: QuoteTweetPro
   }
 
   if (!tweet) {
+    const fallbackUrl = quotedTweetId ? `https://x.com/i/status/${quotedTweetId}` : null;
     return (
-      <div className="mt-3 rounded-2xl border border-[rgb(47,51,54)] p-3 text-[rgb(113,118,123)] text-sm">
-        Quoted tweet unavailable
+      <div
+        className={`mt-3 rounded-2xl border border-[rgb(47,51,54)] p-3 text-sm flex items-center justify-between ${fallbackUrl ? 'cursor-pointer hover:bg-[rgb(22,24,28)] transition-colors' : 'text-[rgb(113,118,123)]'}`}
+        onClick={fallbackUrl ? (e) => {
+          e.stopPropagation();
+          window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
+        } : undefined}
+      >
+        <span className="text-[rgb(113,118,123)]">Quoted tweet unavailable</span>
+        {fallbackUrl && (
+          <span className="text-[rgb(29,155,240)] hover:underline">View on X</span>
+        )}
       </div>
     );
   }
@@ -64,7 +76,7 @@ export default function QuoteTweet({ quotedTweetId, quotedTweet }: QuoteTweetPro
   };
 
   return (
-    <div 
+    <div
       className="mt-3 rounded-2xl border border-[rgb(47,51,54)] overflow-hidden hover:bg-[rgb(22,24,28)] transition-colors cursor-pointer"
       onClick={handleClick}
     >
@@ -101,11 +113,24 @@ export default function QuoteTweet({ quotedTweetId, quotedTweet }: QuoteTweetPro
           )}
         </div>
       </div>
-      
+
       {/* Media in quoted tweet */}
       {media.length > 0 && (
         <div className="border-t border-[rgb(47,51,54)]">
           <MediaGrid media={media} />
+        </div>
+      )}
+
+      {/* Link cards in quoted tweet */}
+      {(tweet.link_cards && tweet.link_cards.length > 0) && (
+        <div className="px-3 pb-3">
+          {tweet.link_cards.map((card, i) => (
+            <LinkCard
+              key={i}
+              card={card}
+              onClick={onArticleClick}
+            />
+          ))}
         </div>
       )}
     </div>

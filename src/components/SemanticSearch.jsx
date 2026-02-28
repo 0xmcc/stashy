@@ -106,6 +106,11 @@ export default function SemanticSearch({
 
     try {
       const contextItems = selectedItems.length ? selectedItems : results;
+
+      if (!contextItems || contextItems.length === 0) {
+        throw new Error("retrievedItems is required and cannot be empty");
+      }
+
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -275,25 +280,25 @@ export default function SemanticSearch({
       </form>
 
       {messages.map((msg, idx) => {
-          const isAssistant = msg.role === "assistant";
-          const cited = extractCitedIndexes(msg.content);
-          return (
-            <article
-              key={`${idx}-${msg.content.slice(0, 20)}`}
-              className="border-b border-[rgb(47,51,54)] px-4 py-3"
-            >
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[rgb(113,118,123)]">
-                {isAssistant ? "AI" : "You"}
+        const isAssistant = msg.role === "assistant";
+        const cited = extractCitedIndexes(msg.content);
+        return (
+          <article
+            key={`${idx}-${msg.content.slice(0, 20)}`}
+            className="border-b border-[rgb(47,51,54)] px-4 py-3"
+          >
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[rgb(113,118,123)]">
+              {isAssistant ? "AI" : "You"}
+            </p>
+            <p className="mb-2 whitespace-pre-wrap text-[15px] leading-6 text-white">{msg.content}</p>
+            {isAssistant ? (
+              <p className="text-xs text-[rgb(113,118,123)]">
+                Sources: {cited.length ? cited.map((n) => `[${n}]`).join(", ") : "No citations found"}
               </p>
-              <p className="mb-2 whitespace-pre-wrap text-[15px] leading-6 text-white">{msg.content}</p>
-              {isAssistant ? (
-                <p className="text-xs text-[rgb(113,118,123)]">
-                  Sources: {cited.length ? cited.map((n) => `[${n}]`).join(", ") : "No citations found"}
-                </p>
-              ) : null}
-            </article>
-          );
-        })}
+            ) : null}
+          </article>
+        );
+      })}
 
       <div className="px-4 py-3">
         <button

@@ -1,9 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { mapXBookmarksToTweets } from "@/lib/twitter";
+import type { LinkCardData } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 
 const PAGE_SIZE = 20;
+
+function deriveLinkCardsFromRawJson(rawJson: unknown): LinkCardData[] {
+  if (!rawJson || typeof rawJson !== "object") return [];
+
+  try {
+    const mapped = mapXBookmarksToTweets(
+      [rawJson] as Parameters<typeof mapXBookmarksToTweets>[0],
+      {}
+    );
+    return Array.isArray(mapped[0]?.link_cards) ? mapped[0].link_cards : [];
+  } catch {
+    return [];
+  }
+}
 
 let _serviceSupabase: SupabaseClient | null = null;
 
@@ -108,7 +124,11 @@ async function fetchPersistedBookmarksPage(ownerXUserId: string, cursor: string 
       {
         ...row,
         media: Array.isArray(row.media) ? row.media : [],
-        link_cards: Array.isArray(row.link_cards) ? row.link_cards : [],
+        link_cards: (() => {
+          const persisted = Array.isArray(row.link_cards) ? row.link_cards : [];
+          if (persisted.length > 0) return persisted;
+          return deriveLinkCardsFromRawJson(row.raw_json);
+        })(),
         tags: Array.isArray(row.tags) ? row.tags : [],
       },
     ])

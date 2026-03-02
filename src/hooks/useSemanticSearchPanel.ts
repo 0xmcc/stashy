@@ -1,12 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { mergeSearchResults } from "../lib/searchResults";
 
-/** Shape of a semantic search result. Matches SemanticResultItem in useSemanticSearch.ts (PR4). */
-export interface SemanticResultItem {
-  id: string;
-  content: string;
-  similarity: number;
-}
+export type { SemanticResultItem } from "./useSemanticSearch";
 
 export interface ChatMessage {
   role: "user" | "assistant";

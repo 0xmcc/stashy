@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Tweet } from "./supabase";
+import { upsertBookmarksCollection } from "./collectionsQuery";
 
 export interface BookmarkPersistenceResult {
   canonical_upserted: number;
@@ -48,21 +49,13 @@ function errorToString(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "object") {
     const err = error as Record<string, unknown>;
-    const pieces = [err.code, err.message, err.details, err.hint]
-      .filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+    const pieces = [err.code, err.message, err.details, err.hint].filter(
+      (value): value is string => typeof value === "string" && value.trim().length > 0
+    );
     if (pieces.length > 0) return pieces.join(" | ");
     return JSON.stringify(error);
   }
   return String(error);
-}
-
-function appendCollectionsMigrationHint(details: string): string {
-  const hint = "Run supabase/sql/collections.sql to create collections + collection_tweets.";
-  const trimmed = details.trim();
-  if (!trimmed || trimmed === "{}") {
-    return `${details} ${hint}`.trim();
-  }
-  return `${details} (${hint})`;
 }
 
 export async function persistBookmarksForOwnerWithClient(
@@ -107,52 +100,11 @@ export async function persistBookmarksForOwnerWithClient(
     throw new Error(`Failed to upsert canonical tweets: ${details}`);
   }
 
-  let usedLegacyOwnerColumn = false;
-  let { data: collection, error: collectionError } = await supabase
-    .from("collections")
-    .upsert(
-      {
-        owner_user_id: ownerUserId,
-        name: "Bookmarks",
-        slug: "bookmarks",
-        visibility: "private",
-        is_system: true,
-      },
-      { onConflict: "owner_user_id,slug", ignoreDuplicates: false }
-    )
-    .select("id")
-    .single();
-
-  const shouldTryLegacyAttempt = collectionError || !collection?.id;
-  if (shouldTryLegacyAttempt) {
-    usedLegacyOwnerColumn = true;
-    const legacyAttempt = await supabase
-      .from("collections")
-      .upsert(
-        {
-          owner_x_user_id: ownerUserId,
-          name: "Bookmarks",
-          slug: "bookmarks",
-          visibility: "private",
-          is_system: true,
-        },
-        { onConflict: "owner_x_user_id,slug", ignoreDuplicates: false }
-      )
-      .select("id")
-      .single();
-    collection = legacyAttempt.data;
-    collectionError = legacyAttempt.error;
-  }
-
-  if (collectionError || !collection?.id) {
-    const details = appendCollectionsMigrationHint(
-      errorToString(collectionError || "Collection row missing after upsert")
-    );
-    throw new Error(`Failed to upsert bookmarks collection: ${details}`);
-  }
+  const { collection_id, used_legacy_owner_column: usedLegacyOwnerColumn } =
+    await upsertBookmarksCollection(supabase, ownerUserId);
 
   const memberRows = uniqueTweets.map((tweet) => ({
-    collection_id: collection.id,
+    collection_id,
     tweet_id: tweet.tweet_id,
   }));
 
@@ -171,7 +123,7 @@ export async function persistBookmarksForOwnerWithClient(
   return {
     canonical_upserted: uniqueTweets.length,
     membership_upserted: memberRows.length,
-    bookmarks_collection_id: collection.id,
+    bookmarks_collection_id: collection_id,
     retried_without_optional_fields: retriedWithoutOptionalFields,
     used_legacy_owner_column: usedLegacyOwnerColumn,
   };

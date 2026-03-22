@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { TWITTER_OAUTH_CALLBACK_COOKIE } from "@/lib/twitterAuth";
 
 function clearTwitterCookies(response: NextResponse) {
   const names = [
@@ -9,6 +10,7 @@ function clearTwitterCookies(response: NextResponse) {
     "x_expires_at",
     "x_oauth_verifier",
     "x_oauth_state",
+    TWITTER_OAUTH_CALLBACK_COOKIE,
   ];
 
   names.forEach((name) => {

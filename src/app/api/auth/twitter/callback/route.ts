@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  resolveTwitterCallbackUrl,
+  TWITTER_OAUTH_CALLBACK_COOKIE,
+} from "@/lib/twitterAuth";
 
 type CallbackFailureReason =
   | "missing_oauth_params"
@@ -46,15 +50,18 @@ function buildCallbackRedirectUrl(
   return url;
 }
 
-async function exchangeCodeForToken(code: string, verifier: string): Promise<TokenResponse> {
+async function exchangeCodeForToken(
+  code: string,
+  verifier: string,
+  callbackUrl: string
+): Promise<TokenResponse> {
   const clientId = process.env.TWITTER_CLIENT_ID;
   const clientSecret = process.env.TWITTER_CLIENT_SECRET;
-  const callbackUrl = process.env.TWITTER_CALLBACK_URL;
 
-  if (!clientId || !callbackUrl) {
+  if (!clientId) {
     throw new TwitterCallbackError(
       "oauth_env_missing",
-      "Missing Twitter OAuth environment variables."
+      "Missing Twitter OAuth client id."
     );
   }
 
@@ -116,6 +123,7 @@ async function fetchCurrentUser(accessToken: string): Promise<MeResponse["data"]
 function clearPkceCookies(response: NextResponse) {
   response.cookies.set("x_oauth_verifier", "", { maxAge: 0, path: "/" });
   response.cookies.set("x_oauth_state", "", { maxAge: 0, path: "/" });
+  response.cookies.set(TWITTER_OAUTH_CALLBACK_COOKIE, "", { maxAge: 0, path: "/" });
 }
 
 function clearPkceAndRedirect(
@@ -132,6 +140,7 @@ export async function GET(request: NextRequest) {
   const state = request.nextUrl.searchParams.get("state");
   const storedVerifier = request.cookies.get("x_oauth_verifier")?.value;
   const storedState = request.cookies.get("x_oauth_state")?.value;
+  const storedCallbackUrl = request.cookies.get(TWITTER_OAUTH_CALLBACK_COOKIE)?.value;
 
   if (!code || !state || !storedVerifier || !storedState || state !== storedState) {
     const reason: CallbackFailureReason =
@@ -154,7 +163,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const token = await exchangeCodeForToken(code, storedVerifier);
+    const callbackUrl = resolveTwitterCallbackUrl(request, storedCallbackUrl);
+    const token = await exchangeCodeForToken(code, storedVerifier, callbackUrl);
     const user = await fetchCurrentUser(token.access_token);
 
     if (!user?.id) {

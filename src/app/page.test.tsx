@@ -273,6 +273,16 @@ describe("URL param effects", () => {
 
     expect(container.textContent).toContain("We couldn't finish connecting your X account");
   });
+
+  it("xConnected=0 still shows a generic X connection failure message when xError is missing", async () => {
+    searchParamsGet.mockImplementation((key: string) =>
+      key === "xConnected" ? "0" : null
+    );
+
+    await renderHome();
+
+    expect(container.textContent).toContain("We couldn't finish connecting your X account");
+  });
 });
 
 // ---------------------------------------------------------------------------

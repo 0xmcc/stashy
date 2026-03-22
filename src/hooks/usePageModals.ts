@@ -51,7 +51,7 @@ export function usePageModals({ onXConnected }: UsePageModalsOptions = {}): UseP
     }
 
     if (xConnected === "0") {
-      setXConnectionError(xError);
+      setXConnectionError(xError ?? "");
     }
 
     if (

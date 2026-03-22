@@ -10,6 +10,7 @@ const COOKIE_NAMES = [
   "x_expires_at",
   "x_oauth_verifier",
   "x_oauth_state",
+  "x_oauth_callback_url",
 ];
 
 function makeRequest(method = "POST"): NextRequest {

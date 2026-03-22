@@ -1,5 +1,9 @@
 import { randomBytes, createHash } from "crypto";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import {
+  buildTwitterCallbackUrl,
+  TWITTER_OAUTH_CALLBACK_COOKIE,
+} from "@/lib/twitterAuth";
 
 function toBase64Url(value: Buffer): string {
   return value
@@ -9,16 +13,17 @@ function toBase64Url(value: Buffer): string {
     .replace(/=+$/g, "");
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const clientId = process.env.TWITTER_CLIENT_ID;
-  const callbackUrl = process.env.TWITTER_CALLBACK_URL;
 
-  if (!clientId || !callbackUrl) {
+  if (!clientId) {
     return NextResponse.json(
-      { error: "Missing TWITTER_CLIENT_ID or TWITTER_CALLBACK_URL" },
+      { error: "Missing TWITTER_CLIENT_ID" },
       { status: 500 }
     );
   }
+
+  const callbackUrl = buildTwitterCallbackUrl(request);
 
   const verifier = toBase64Url(randomBytes(48));
   const challenge = toBase64Url(createHash("sha256").update(verifier).digest());
@@ -47,6 +52,14 @@ export async function GET() {
   });
 
   response.cookies.set("x_oauth_state", state, {
+    httpOnly: true,
+    secure,
+    sameSite: "lax",
+    maxAge: 60 * 10,
+    path: "/",
+  });
+
+  response.cookies.set(TWITTER_OAUTH_CALLBACK_COOKIE, callbackUrl, {
     httpOnly: true,
     secure,
     sameSite: "lax",

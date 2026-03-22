@@ -59,7 +59,7 @@ function HomeContent() {
   return (
     <>
       {modals.showSuccess && <SuccessToast onDismiss={() => modals.setShowSuccess(false)} />}
-      {modals.xConnectionError && (
+      {modals.xConnectionError !== null && (
         <XConnectionNotice
           errorCode={modals.xConnectionError}
           onDismiss={() => modals.setXConnectionError(null)}

@@ -258,6 +258,46 @@ public_metrics?: {
     *   `F` (`useTweetFeed` decomposition with typed branch-safe API)
     *   `G` (`SemanticSearch.jsx` → TS + panel hook)
     *   `I + H` (auth route tests prerequisite + collections fallback consolidation)
+*   **Refactoring Workflow Rules:**
+    *   Each lettered block = one branch + one PR (branch off master, target master)
+    *   Rebase before merge (git rebase master); no stacking unless explicitly planned
+    *   Test-first: add characterization tests locking current behavior before moving code — never delete passing tests
+    *   Subagents: use Explore/Plan subagents per PR to verify scope before touching files
+    *   Gate: npx vitest run && npx tsc --noEmit must be green before starting and after completing each PR
+    *   JS/TS boundary caution: search/route.js consumes shared TS modules — verify the Next.js config transpiles src/lib/ for mixed-module routes before each relevant change
+    *   File-scope guardrail: If any file outside the listed scope appears in `git diff master...HEAD --name-only`, stop and fix before requesting review.
+    *   After rebasing pushed branches, you need force-push for each rebased branch:
+        *   `git push --force-with-lease origin <branch_name>`
+    *   Use `rg` instead of `grep` for pattern checks.
+    *   Lock a baseline once on `master` first, then compare branch outputs against that baseline. If the baseline itself changes during cleanup, regenerate baseline and rerun branch comparisons.
+*    **PR Description Template:** Each PR description must include these four sections:
+
+```
+## Scope
+[List of files changed and why]
+
+## Acceptance Criteria
+[Specific, verifiable conditions]
+
+## Test Evidence
+### vitest run
+```
+[paste output]
+```
+### tsc --noEmit
+```
+[paste output — pre-existing errors noted]
+```
+
+## Behavior Changes
+None. This is a mechanical extraction — no logic changed, no new behavior introduced.
+```
+*   **Phased Test-First Approach:** For PR4/PR5/PR6, start with PR4 only (`page.tsx` split) and land its characterization tests first. If PR4 passes with no behavior drift, move to PR5 (`useTweetFeed` decomposition). Only then do PR6 (SemanticSearch TS conversion), since it depends on prior state-flow stability.
+    *   Add/extend characterization tests **before** refactor.
+    *   Keep PR scope tight.
+    *   Rebase, run `vitest` + `tsc`, and attach evidence.
+    *   Do targeted manual smoke for the affected workflow.
+*   **Branching Hygiene:** Create true PR branches (PR4 base, PR5 off PR4 or rebased to master after merge, PR6 similarly). Keep each PR description explicit about dependency and behavior invariants.
 
 ## REFERENCE EXAMPLES
 *   **X API v2 field mappings to Tweet field:**
@@ -328,3 +368,5 @@ After syncing bookmarks once, you should see rows in both.
 *   **Refactoring Tools:**
     *   Use `/batch` for mechanical, mostly independent migrations with clear test or type-check gates. Not ideal for tightly coupled behavioral refactors.
     *   Use `/simplify` after each PR slice to clean duplication, tighten typings, and enforce project conventions.
+*   Re-run a quick `master` baseline right before final merge in case upstream changed since your captures. If unchanged, you’re clear.
+*   Continue with PR4-6 but sequentially, adding/extending characterization tests before refactoring.
